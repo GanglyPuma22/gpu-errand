@@ -171,6 +171,48 @@ class CliAndScriptsTests(unittest.TestCase):
                 r = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
                 self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_watchdog_starts_before_the_rate_lookup(self):
+        # Spend is bounded from the moment the GPU is granted, even if `colab usage` hangs.
+        text = (SCRIPTS / "colab_job.sh").read_text(encoding="utf-8")
+        self.assertLess(text.index("WATCHDOG=$!"), text.index('USAGE=$(timeout 60'))
+        self.assertIn('echo $(( T0 + CAP )) > "$DEADLINE"', text)
+
+    def test_results_land_apart_from_host_files_without_links(self):
+        text = (SCRIPTS / "colab_job.sh").read_text(encoding="utf-8")
+        self.assertIn('tar -xf - -C "$OUT"', text)
+        cleanup = text.index('! -type f ! -type d -print -delete')
+        self.assertLess(cleanup, text.index('"$RES/BUILD.txt"'))
+
+    def test_queue_jobs_do_not_inherit_the_service_lock(self):
+        self.assertIn("2>&1 7>&- &", (SCRIPTS / "service.sh").read_text(encoding="utf-8"))
+
+    def test_command_gets_only_the_time_left_after_setup(self):
+        text = (SCRIPTS / "runtime_job.sh").read_text(encoding="utf-8")
+        self.assertNotIn("LEFT=60", text)
+        self.assertIn('if [ "$LEFT" -le 0 ]; then', text)
+
+    def test_here_refuses_a_destination_it_cannot_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+            (repo / "a.txt").write_text("x")
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+            jf = Path(tmp) / "job.json"
+            jf.write_text(json.dumps(job(type="shell", ref="main", setup="", command="touch \"$OUT_DIR/ran\"", where="here")))
+            dest = Path(tmp) / "a-file"
+            dest.write_text("not a folder")
+            r = subprocess.run([sys.executable, "-m", "gpu_errand", "here", str(jf), str(repo), str(dest)],
+                               cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2, r.stderr)
+            self.assertIn("cannot write results", r.stderr)
+            out = Path(tmp) / "out"
+            r = subprocess.run([sys.executable, "-m", "gpu_errand", "here", str(jf), str(repo), str(out)],
+                               cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue((out / "ran").is_file())
+
     def test_service_host_never_runs_job_commands(self):
         # The host packs, copies and polls; setup and command run only on the runtime.
         text = (SCRIPTS / "colab_job.sh").read_text(encoding="utf-8")

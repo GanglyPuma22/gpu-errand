@@ -23,7 +23,9 @@ HEAD=$(git -C "$CHECKOUT" rev-parse HEAD)
 [ -n "$WANT" ] && [ "$WANT" = "$HEAD" ] || { echo "checkout HEAD $HEAD is not the job's ref $REF ($WANT)" >&2; exit 2; }
 NEED=(python3); [ "$TYPE" = godot-capture ] && NEED+=(xvfb-run)
 for t in "${NEED[@]}"; do command -v "$t" > /dev/null || { echo "missing $t" >&2; exit 2; }; done
-mkdir -p "$DEST"; DEST=$(realpath "$DEST")
+# The destination must be a writable folder before anything runs.
+mkdir -p "$DEST" 2> /dev/null && [ -d "$DEST" ] && [ -w "$DEST" ] || { echo "cannot write results to $DEST" >&2; exit 2; }
+DEST=$(realpath "$DEST")
 JOB=$(mktemp -d); trap 'rm -rf "$JOB"' EXIT
 cp "$JOBFILE" "$JOB/job.json"; ln -s "$CHECKOUT" "$JOB/repo"
 DEV=$(vulkaninfo --summary 2> /dev/null | grep -m1 deviceName | sed 's/.*= //')
@@ -37,6 +39,11 @@ esac
 SCREEN=(); [ "$TYPE" = godot-capture ] && SCREEN=(xvfb-run -a -s "-screen 0 1920x1080x24")
 "${SCREEN[@]}" env JOB_ROOT="$JOB" ERRAND_COMMIT="$HEAD" bash "$HERE/runtime_job.sh"
 RC=$?
-cp -a "$JOB/out/." "$DEST/"; cp "$JOB/progress.txt" "$DEST/progress.txt" 2>/dev/null
+if ! { cp -a "$JOB/out/." "$DEST/" && cp "$JOB/progress.txt" "$DEST/progress.txt"; }; then
+	# Keep the only full copy rather than reporting success over a failed delivery.
+	trap - EXIT
+	echo "copying results to $DEST failed; they are kept in $JOB/out (job exit $RC)" >&2
+	exit 3
+fi
 echo "job exit $RC; results in $DEST"
 exit $RC

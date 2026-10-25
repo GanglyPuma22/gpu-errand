@@ -37,4 +37,4 @@ One JSON object per job. `gpu-errand validate <file>` checks every rule below; `
 
 ## Results
 
-`runner.json`: `{"id", "setup_exit", "run_exit", "minutes", "gpu"}`. `BUILD.txt` (Colab only): repository, ref, commit, GPU and the `gpu=` line. `env.txt`: what the runtime had. `setup.log`, `run.log`, `progress.txt`. Everything else is the job's own `OUT_DIR`.
+From a Colab run, the results folder holds the host's files: `driver.log`, `BUILD.txt` (repository, ref, commit, GPU and the `gpu=` line) and `removed-not-regular.txt`. Its `out/` folder holds the job's own `OUT_DIR`, with only regular files kept. In `out/` the runner adds `runner.json` (`{"id", "setup_exit", "run_exit", "minutes", "gpu"}`), `env.txt` (what the runtime had), `setup.log`, `run.log`, `progress.txt` and `MANIFEST.sha256`. `setup` and `command` share `max_minutes`: the command gets only the time setup left.

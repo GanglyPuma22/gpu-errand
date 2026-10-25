@@ -34,6 +34,8 @@ COLAB_SESSION=music-1 gpu-errand run chase-music-1.json
 
 ## What comes back
 
+In the results folder's `out/`:
+
 - `originals/<cue>-<seed>/*.flac`: the track as generated, 48 kHz stereo.
 - `loops/<cue>-<seed>.wav`: the loop, with the last few seconds crossfaded into the start (when `loop_crossfade_seconds` is set).
 - `seams/<cue>-<seed>-wrap.wav`: 24 s that plays across the loop point, so you can hear whether the seam works.

@@ -35,6 +35,8 @@ Stable Audio Open is gated: accept its license on the model page with your Huggi
 
 ## What comes back
 
+In the results folder's `out/`:
+
 - `originals/<cue>-<seed>.wav`: the effect as generated, 32-bit float. Peaks can go above 1.0; that's headroom, not clipping.
 - `previews/<cue>-<seed>.wav`: 16-bit, peaking at -1 dBFS, ready to audition.
 - `receipt.json`: each file's hash, length, peak and loudness, plus timings.

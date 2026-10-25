@@ -50,7 +50,7 @@ What happens:
 5. It checks every file against a SHA-256 list made on the runtime.
 6. It stops the runtime, also on error and at the cap.
 
-Results land in `~/.gpu-errand/results/<id>-<time>/`. With `RESULTS_REPO` set, they also go to branch `errand-results/<id>`.
+The job's files land in `~/.gpu-errand/results/<id>-<time>/out/`, and the runner's logs sit beside that folder. Links and special files are dropped. With `RESULTS_REPO` set, they also go to branch `errand-results/<id>`.
 
 Exit codes:
 

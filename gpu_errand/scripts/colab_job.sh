@@ -11,7 +11,8 @@
 # The job's commands run only on the runtime: this host packs the commit with
 # git archive, copies it in, polls, copies OUT_DIR back and stops the runtime
 # on exit, on error and at the cap.
-# Results: $WORK/results/<id>-<UTC time>-XXXX/ (runner.json first), and, when
+# Results: $WORK/results/<id>-<UTC time>-XXXX/ (the job's OUT_DIR in out/,
+# this host's logs beside it), and, when
 # RESULTS_REPO is set, a fresh one-commit branch errand-results/<id> there.
 set -euo pipefail
 JOBFILE=$(realpath "${1:?usage: colab_job.sh JOB.json}")
@@ -106,9 +107,19 @@ for try in $(seq $(( WAIT / 5 + 1 ))); do
 	say "no free $GPU yet (try $try), waiting 5 min"; sleep 300
 done
 T0=$(date +%s)
-trap '"${COLAB[@]}" stop -s "$SESSION" > /dev/null 2>&1 || true' EXIT
 CAP=$(( (MAXMIN + 20) * 60 ))
-USAGE=$("${COLAB[@]}" usage 2> /dev/null || true)
+# Watchdog over the whole runtime's life (start-up, copies, the job, results),
+# started the moment the GPU is granted. It stops the runtime at the deadline
+# in $DEADLINE (seconds since the epoch), which ends any ssh call still hanging;
+# the unit ceiling below can only move that deadline earlier.
+DEADLINE=$RES/deadline; echo $(( T0 + CAP )) > "$DEADLINE"
+( exec 7>&-
+  while [ "$(date +%s)" -lt "$(cat "$DEADLINE" 2> /dev/null || echo 0)" ]; do sleep 5; done
+  echo "[errand $(date -u +%T)] watchdog: deadline reached $(( $(date +%s) - T0 )) s after the runtime started, stopping it" >> "$RES/driver.log"
+  "${COLAB[@]}" stop -s "$SESSION" > /dev/null 2>&1 ) &
+WATCHDOG=$!
+trap 'kill "$WATCHDOG" 2> /dev/null; say "stopping runtime"; "${COLAB[@]}" stop -s "$SESSION" || true; rm -f "$RES/repo.tar"' EXIT
+USAGE=$(timeout 60 "${COLAB[@]}" usage 2> /dev/null || true)
 echo "$USAGE" | head -5 >> "$RES/driver.log"
 RATE1=$(echo "$USAGE" | rate || true)
 # The ceilings use the account's whole rate after allocation: never less than this
@@ -121,16 +132,14 @@ if [ -n "$MAXUNITS" ]; then
 	if [ -n "$MAXRATE" ] && python3 -c "import sys;sys.exit(0 if float(sys.argv[1])>float(sys.argv[2]) else 1)" "$OWN" "$MAXRATE"; then
 		say "rate $OWN is over the job's max_rate $MAXRATE: stop"; exit 1
 	fi
+	# Counted from T0, so time spent reading the rate is already spent.
 	UCAP=$(python3 -c "import sys;print(int(float(sys.argv[1])/float(sys.argv[2])*3600))" "$MAXUNITS" "$OWN")
-	[ "$UCAP" -lt "$CAP" ] && { CAP=$UCAP; say "cap: $CAP s from the $MAXUNITS unit ceiling"; }
+	if [ "$UCAP" -lt "$CAP" ]; then
+		CAP=$UCAP; echo $(( T0 + CAP )) > "$DEADLINE"
+		say "cap: $CAP s after the runtime started, from the $MAXUNITS unit ceiling"
+	fi
+	[ $(( $(date +%s) - T0 )) -lt "$CAP" ] || { say "unit ceiling already reached: stop"; exit 1; }
 fi
-# Watchdog over the whole runtime's life (start-up, copies, the job, results):
-# at the cap it stops the runtime, which ends any ssh call still hanging.
-( sleep "$CAP"; echo "[errand $(date -u +%T)] watchdog: $CAP s since the runtime started, stopping it" >> "$RES/driver.log"
-  "${COLAB[@]}" stop -s "$SESSION" > /dev/null 2>&1 ) &
-WATCHDOG=$!
-trap 'kill "$WATCHDOG" 2> /dev/null; say "stopping runtime"; "${COLAB[@]}" stop -s "$SESSION" || true; rm -f "$RES/repo.tar"' EXIT
-"${COLAB[@]}" usage 2> /dev/null | head -3 >> "$RES/driver.log" || true
 for try in 1 2 3 4 5; do
 	ssh runtime 'mkdir -p /content/job/repo /content/job/out' && break
 	[ "$try" = 5 ] && { say "ssh to the runtime failed 5 times: stop"; exit 1; }
@@ -185,24 +194,27 @@ done
 # a run counts only when what arrived matches what the runtime wrote.
 ssh runtime "cd /content/job && cp progress.txt runner.log out/ 2>/dev/null; (cd out && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 -r sha256sum > MANIFEST.sha256); du -sm out | cut -f1" > "$RES/out-mb.txt" || true
 MB=$(cat "$RES/out-mb.txt" 2>/dev/null || echo 0)
-if [ "${MB:-0}" -gt "$CAPMB" ]; then
-	say "OUT_DIR is $MB MB, over the job's $CAPMB MB: bringing back files under 10 MB only"
-	ssh runtime 'cd /content/job/out && find . -type f -size -10M -print0 | tar --null -T - -cf -' | tar -xf - -C "$RES"
-else
-	ssh runtime 'tar -cf - -C /content/job/out .' | tar -xf - -C "$RES"
-fi
+# The job's files land in $RES/out, apart from this host's own files, and only
+# regular files are asked for. Anything else that arrives (links, devices) is
+# deleted before the host reads a single path, and listed.
+OUT=$RES/out; mkdir -p "$OUT"
+LIMIT=""; if [ "${MB:-0}" -gt "$CAPMB" ]; then LIMIT="-size -10M"
+	say "OUT_DIR is $MB MB, over the job's $CAPMB MB: bringing back files under 10 MB only"; fi
+ssh runtime "cd /content/job/out && find . -type f $LIMIT -print0 | tar --null --no-recursion -T - -cf -" | tar -xf - -C "$OUT" --no-same-owner --no-same-permissions
+find "$OUT" -mindepth 1 ! -type f ! -type d -print -delete > "$RES/removed-not-regular.txt"
+[ -s "$RES/removed-not-regular.txt" ] && say "removed $(grep -c . "$RES/removed-not-regular.txt") link(s) or special file(s) from the results (listed in removed-not-regular.txt)"
 VERIFIED=0
-if [ -s "$RES/MANIFEST.sha256" ]; then
+if [ -s "$OUT/MANIFEST.sha256" ]; then
 	if [ "${MB:-0}" -gt "$CAPMB" ]; then
-		(cd "$RES" && sha256sum --quiet -c --ignore-missing MANIFEST.sha256) && VERIFIED=1
+		(cd "$OUT" && sha256sum --quiet -c --ignore-missing MANIFEST.sha256) && VERIFIED=1
 	else
-		(cd "$RES" && sha256sum --quiet -c MANIFEST.sha256) && VERIFIED=1
+		(cd "$OUT" && sha256sum --quiet -c MANIFEST.sha256) && VERIFIED=1
 	fi
 fi
 [ "$VERIFIED" = 1 ] && say "results match the runtime's SHA-256 list" || say "results do NOT match the runtime's SHA-256 list (or it is missing)"
 say "runtime minutes: $(( ($(date +%s) - T0) / 60 ))"
 "${COLAB[@]}" usage 2> /dev/null | head -3 >> "$RES/driver.log" || true
-echo "build: $REPO $REF @ $COMMIT, $GPU, $(grep -m1 gpu= "$RES/env.txt" 2>/dev/null || echo 'gpu line missing')" > "$RES/BUILD.txt"
+echo "build: $REPO $REF @ $COMMIT, $GPU, $(grep -m1 gpu= "$OUT/env.txt" 2>/dev/null || echo 'gpu line missing')" > "$RES/BUILD.txt"
 
 PUSHED=0; [ -n "${RESULTS_REPO:-}" ] || PUSHED=1   # no results repo: the local folder is the delivery
 # Per-file size on a results branch: 10 MB for repo jobs (clips are small), 95 MB
@@ -221,7 +233,7 @@ if [ -n "${RESULTS_REPO:-}" ]; then
 		&& { say "results pushed to $RESULTS_REPO branch errand-results/$ID"; PUSHED=1; } || say "results push FAILED (kept in $RES)"
 	rm -rf "$P"
 fi
-RC=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(0 if d.get('setup_exit')==0 and d.get('run_exit')==0 else 1)" "$RES/runner.json" 2>/dev/null || echo 1)
+RC=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(0 if d.get('setup_exit')==0 and d.get('run_exit')==0 else 1)" "$OUT/runner.json" 2>/dev/null || echo 1)
 # Results nobody can reach are a failed job: the queue stops and says so.
 [ "$RC" = 0 ] && [ "$VERIFIED" = 0 ] && RC=4
 [ "$RC" = 0 ] && [ "$PUSHED" = 0 ] && RC=3

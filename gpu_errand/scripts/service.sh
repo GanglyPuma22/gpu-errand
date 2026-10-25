@@ -102,7 +102,8 @@ while :; do
 				# A line with no job file stops the queue (nothing recorded, so it runs once the file is pushed and you type go).
 				cp "$QDIR/jobs/$name" "$WORK/jobs/$name" 2> /dev/null || { STOPPED="queue.txt lists $name but jobs/$name is missing"; break; }
 				echo "$name" >> "$DONE"
-				nohup bash "$HERE/colab_job.sh" "$WORK/jobs/$name" > "$WORK/run-${name%.json}.log" 2>&1 &
+				# 7>&-: the job and its watchdog must not hold the service lock.
+				nohup bash "$HERE/colab_job.sh" "$WORK/jobs/$name" > "$WORK/run-${name%.json}.log" 2>&1 7>&- &
 				PIDS[$!]=${name%.json}; LAUNCHED=$((LAUNCHED + 1))
 				echo "launched $name" >> "$WORK/launched-$(basename "$GO")"
 				say "launched ${name%.json} ($LAUNCHED of $MAX_JOBS)"; push_status

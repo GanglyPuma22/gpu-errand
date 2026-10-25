@@ -49,10 +49,15 @@ fi
 # script's children stop at the cap too; -k 30 kills what ignores TERM.
 RC=99
 if [ "$SRC" = 0 ]; then
-	LEFT=$(( MAXMIN * 60 - ($(date +%s) - T0) )); [ "$LEFT" -lt 60 ] && LEFT=60
-	log "run: $CMD"
-	timeout -k 30 "$LEFT" bash -c "$CMD" > "$OUT/run.log" 2>&1; RC=$?
-	log "run exit $RC"
+	# Setup and command share max_minutes: the command gets what is left, never more.
+	LEFT=$(( MAXMIN * 60 - ($(date +%s) - T0) ))
+	if [ "$LEFT" -le 0 ]; then
+		RC=124; log "no time left after setup: command not started (exit 124, as timeout reports)"
+	else
+		log "run: $CMD"
+		timeout -k 30 "$LEFT" bash -c "$CMD" > "$OUT/run.log" 2>&1; RC=$?
+		log "run exit $RC"
+	fi
 fi
 GPU=$(grep -m1 '^gpu=' "$JOB/env.txt" 2>/dev/null || echo "gpu=unknown (no runtime_display.sh)")
 python3 - "$OUT/runner.json" "$ID" "$SRC" "$RC" "$(( ($(date +%s) - T0) / 60 ))" "$GPU" <<'PY'
