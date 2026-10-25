@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "id": "hello-gpu",
+  "type": "shell",
+  "repo": "your-name/your-repo",
+  "ref": "main",
+  "command": "nvidia-smi > \"$OUT_DIR/gpu.txt\"; python3 -c \"import torch;print(torch.cuda.get_device_name(0))\" >> \"$OUT_DIR/gpu.txt\"",
+  "gpu": "T4",
+  "max_minutes": 5,
+  "results_max_mb": 5
+}

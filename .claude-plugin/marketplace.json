@@ -1,0 +1,14 @@
+{
+  "name": "gpu-errand",
+  "description": "GPU Errand: Colab GPU jobs for coding agents.",
+  "owner": {
+    "name": "GPU Errand contributors"
+  },
+  "plugins": [
+    {
+      "name": "gpu-errand",
+      "source": "./",
+      "description": "Let your coding agent run jobs on a Google Colab GPU with a hard compute-unit cap, checked results and a receipt for every run. Includes recipes for game music (ACE-Step), sound effects (Stable Audio Open) and headless Godot captures."
+    }
+  ]
+}

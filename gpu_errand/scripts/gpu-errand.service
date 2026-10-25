@@ -1,0 +1,22 @@
+# systemd user unit for the GPU Errand queue on your always-on machine (Linux,
+# or WSL with systemd). Install once:
+#   mkdir -p ~/.config/systemd/user
+#   sed "s#@SCRIPTS@#$(gpu-errand where | python3 -c 'import json,sys;print(json.load(sys.stdin)["scripts"])')#" \
+#     gpu-errand.service > ~/.config/systemd/user/gpu-errand.service
+#   systemctl --user daemon-reload && systemctl --user enable gpu-errand.service
+#   loginctl enable-linger "$USER"     # keep it running with nobody logged in
+# Then each go: gpu-errand service go
+# A clean stop (limits reached, a failed job, stop asked) stays stopped across
+# reboots until the next go; a crash restarts it.
+[Unit]
+Description=GPU Errand queue (Colab GPU jobs)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash @SCRIPTS@/service.sh run
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target
