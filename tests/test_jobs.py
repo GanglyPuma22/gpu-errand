@@ -214,9 +214,9 @@ class CliAndScriptsTests(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue((out / "ran").is_file())
 
-    def test_a_failed_stop_leaves_the_watchdog_retrying(self):
+    def test_a_failed_stop_keeps_the_runner_until_the_watchdog_is_done(self):
         # Stub Colab CLI: the GPU is granted, the rate is over the job's
-        # max_rate (so the run refuses right away), and stop fails 5 times.
+        # max_rate (so the run refuses right away), and stop fails until OK_AT.
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             stub = tmp / "colab"
@@ -234,16 +234,18 @@ class CliAndScriptsTests(unittest.TestCase):
                 ["bash", str(SCRIPTS / "colab_job.sh"), str(ROOT / "examples/jobs/sound-effects.json")],
                 env={**env, "OK_AT": str(ok_at)}, capture_output=True, text=True, timeout=60)
             r = run(6)
+            # The runner waits for the watchdog's retries instead of leaving
+            # them behind, so the stop is done when it returns.
             self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-            self.assertIn("runtime not confirmed stopped", r.stdout)
-            stopped = list((tmp / "home/results").glob("*/stopped"))
-            for _ in range(40):
-                if stopped:
-                    break
-                time.sleep(0.5)
-                stopped = list((tmp / "home/results").glob("*/stopped"))
-            self.assertTrue(stopped, "the watchdog never stopped the runtime")
+            self.assertIn("the watchdog stopped the runtime", r.stdout)
+            self.assertTrue(list((tmp / "home/results").glob("*/stopped")))
             self.assertEqual((tmp / "stops").read_text().strip(), "6")
+            # Stop never works: the runner says so once the watchdog gives up.
+            (tmp / "stops").unlink()
+            r = run(99)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("runtime not confirmed stopped", r.stdout)
+            self.assertEqual((tmp / "stops").read_text().strip(), "33")
             # A stop that works the first time ends the watchdog: no more stops.
             (tmp / "stops").unlink()
             r = run(1)

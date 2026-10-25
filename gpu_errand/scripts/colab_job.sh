@@ -127,7 +127,8 @@ stop_once() { timeout 120 "${COLAB[@]}" stop -s "$SESSION" < /dev/null; }
   echo "[errand $(date -u +%T)] watchdog: could not stop session $SESSION after 30 tries; stop it by hand: colab stop -s $SESSION" >> "$RES/driver.log" ) &
 WATCHDOG=$!
 # The watchdog stays armed until a stop succeeds. If cleanup can't stop the
-# runtime, it pulls the deadline to now and leaves the watchdog retrying.
+# runtime, it pulls the deadline to now and waits while the watchdog retries,
+# so the runner (and a queue that tracks it) lives until those retries end.
 cleanup() {
 	local rc=$? try
 	rm -f "$RES/repo.tar"
@@ -138,9 +139,11 @@ cleanup() {
 		say "stop failed (try $try)"; sleep $(( try * PAUSE ))
 	done
 	date +%s > "$DEADLINE"
-	say "WARNING: runtime not confirmed stopped; the watchdog keeps trying for 30 min (see driver.log). By hand: colab stop -s $SESSION"
-	[ "$rc" = 0 ] && rc=1
-	exit "$rc"
+	say "stop not confirmed: the watchdog keeps trying for up to 30 min (see driver.log)"
+	wait "$WATCHDOG" 2> /dev/null || true
+	if [ -e "$RES/stopped" ]; then say "the watchdog stopped the runtime"; exit "$rc"; fi
+	say "WARNING: runtime not confirmed stopped; it may still spend units. Stop it by hand: colab stop -s $SESSION"
+	exit 1
 }
 trap cleanup EXIT
 USAGE=$(timeout 60 "${COLAB[@]}" usage 2> /dev/null || true)
