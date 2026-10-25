@@ -24,7 +24,7 @@ Start from [examples/jobs](../../examples/jobs) and the [job format](references/
 - Git decides what runs: the runner packs exactly the commit `ref` names, without `.git`. Push first.
 - Write results under `$OUT_DIR`. `$JOB_ID` and `$ERRAND_COMMIT` are set for you.
 - No credentials go to a runtime, and `env` refuses names that look like secrets.
-- `model-run` needs `max_units` (the spending ceiling). Add `max_rate` (units per hour) to refuse a pricier GPU than expected.
+- `max_units` is the spending ceiling: `model-run` needs it, and the other types should carry the person's cap in it too. Add `max_rate` (units per hour) to refuse a pricier GPU than expected.
 
 ## 2. Check it and show the plan
 

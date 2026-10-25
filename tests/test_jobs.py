@@ -120,6 +120,16 @@ class JobTests(unittest.TestCase):
         here = cloudrun.plan(job(), "here")["steps"]
         self.assertFalse(any("colab" in s for s in here))
 
+    def test_repo_jobs_can_carry_a_unit_ceiling(self):
+        self.assertEqual(cloudrun.validate(job(max_units=0.1, max_rate=3)), [])
+        self.assertIn("max_rate needs max_units", cloudrun.validate(job(max_rate=3)))
+        self.assertTrue(any("max_units must be" in e for e in cloudrun.validate(job(max_units=0))))
+        steps = cloudrun.plan(job(max_units=0.1))["steps"]
+        self.assertTrue(any("or 0.1 units" in s for s in steps))
+        self.assertTrue(any("no unit ceiling" in s for s in cloudrun.plan(job())["steps"]))
+        for f in (ROOT / "examples/jobs").glob("*.json"):
+            self.assertEqual(cloudrun.validate(json.loads(f.read_text())), [], f.name)
+
     def test_shell_jobs_get_no_screen_and_capture_jobs_do(self):
         shell = " ".join(cloudrun.plan(job(type="shell"))["steps"])
         self.assertIn("no screen", shell)

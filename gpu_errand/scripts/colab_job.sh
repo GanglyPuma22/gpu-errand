@@ -36,7 +36,7 @@ if [ "$TYPE" = model-run ]; then
 	MAXUNITS=$(J 'print(d["max_units"])'); MAXRATE=$(J 'print(d.get("max_rate",""))')
 else
 	REPO=$(J 'print(d["repo"])'); REF=$(J 'print(d["ref"])'); GPU=$(J 'print(d.get("gpu","L4"))')
-	MAXUNITS=""; MAXRATE=""
+	MAXUNITS=$(J 'print(d.get("max_units",""))'); MAXRATE=$(J 'print(d.get("max_rate",""))')
 fi
 SESSION=${COLAB_SESSION:-errand-$ID}
 mkdir -p "$WORK/results" "$WORK/repos"

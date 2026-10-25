@@ -113,6 +113,14 @@ def validate(job, allow_repos=None, allow_refs=None):
     mb = job.get("results_max_mb", 200)
     if not isinstance(mb, (int, float)) or isinstance(mb, bool) or not 1 <= mb <= MAX_RESULTS_MB:
         errors.append(f"results_max_mb must be a number from 1 to {MAX_RESULTS_MB}")
+    # Optional spending ceiling, as for model runs (enforced on Colab only).
+    if "max_units" in job:
+        _number(job, "max_units", 0.01, MAX_UNITS, errors)
+    if "max_rate" in job:
+        if "max_units" not in job:
+            errors.append("max_rate needs max_units")
+        else:
+            _number(job, "max_rate", 0.1, 50, errors)
     godot = job.get("godot")
     if godot is not None:
         if not isinstance(godot, dict) or not isinstance(godot.get("url"), str) or not godot["url"].startswith("https://"):
@@ -244,6 +252,12 @@ def parse_queue(text):
     return jobs, stop
 
 
+def _rate_rule(job):
+    if "max_rate" in job:
+        return f"refuse an unknown rate or one above {job['max_rate']} units/hour"
+    return "refuse an unknown rate"
+
+
 def plan(job, where=None):
     """The exact steps a runner takes for this job, for review before a go."""
     errors = validate(job)
@@ -259,7 +273,7 @@ def plan(job, where=None):
         if recipe.get("gated"):
             steps.append(f"host: resolve short-lived download links for {recipe['model']['repo']} with the host's Hugging Face login (the token never leaves the host)")
         steps += [
-            f"host: colab new --gpu {gpu}; read the hourly rate; refuse above {job.get('max_rate', 'no')} units/hour; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first",
+            f"host: colab new --gpu {gpu}; read the hourly rate; {_rate_rule(job)}; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first",
             "runtime: setup: " + recipe.get("setup_summary", "the recipe's setup.sh"),
             "runtime: run: " + recipe.get("run_summary", "the recipe's run.sh"),
             "host: copy OUT_DIR back, check every file against the runtime's SHA-256 list, stop the runtime, push results",
@@ -269,6 +283,8 @@ def plan(job, where=None):
         steps += [
             f"host: git fetch {job['repo']} {job['ref']}; git archive that commit (no .git, no credentials)",
             f"host: colab new --gpu {job.get('gpu', 'L4')} (waits for a free GPU; the account's limit applies)",
+            (f"host: read the hourly rate; {_rate_rule(job)}; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first"
+             if "max_units" in job else f"host: cap the runtime at {job['max_minutes']} min + 20 (no unit ceiling set)"),
             "host: copy the archive and the runtime scripts in over colab ssh",
         ]
         if job["type"] == "godot-capture":

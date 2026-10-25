@@ -14,6 +14,8 @@ One JSON object per job. `gpu-errand validate <file>` checks every rule below; `
 | `where` | no | `colab` (default) or `here`. |
 | `gpu` | no | `L4` (default), `T4` or `A100`; what the account can hold decides how many run at once. |
 | `max_minutes` | yes | 1-240. Setup and command together; the runner adds 20 minutes for the runtime to start and copy in. |
+| `max_units` | no | 0.01-20 compute units, as for `model-run` below. On Colab the runtime is stopped at this ceiling or the time cap, whichever comes first. Set it whenever the person gave a unit cap. |
+| `max_rate` | no | Units per hour, with `max_units`: the run stops at once if the session's rate is higher. |
 | `results_max_mb` | no | 1-500 (default 200). Past it, only files under 10 MB come back. Files over 10 MB never go to a results branch. |
 | `godot` | no | `{"url": "https://...zip", "sha256": "<64 hex>"}`: the runner downloads the engine, checks it and sets `GODOT`. A game that fetches its own engine in `setup` leaves this out. |
 | `env` | no | `{"NAME": "value"}`, upper-case names, one-line values. Not `OUT_DIR`, `GODOT`, `JOB_ID`, `ERRAND_COMMIT`, `DISPLAY`, and nothing that looks like a token, secret, password or key. |
