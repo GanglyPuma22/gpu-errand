@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 from gpu_errand import jobs as cloudrun
@@ -212,6 +213,43 @@ class CliAndScriptsTests(unittest.TestCase):
                                cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue((out / "ran").is_file())
+
+    def test_a_failed_stop_leaves_the_watchdog_retrying(self):
+        # Stub Colab CLI: the GPU is granted, the rate is over the job's
+        # max_rate (so the run refuses right away), and stop fails 5 times.
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            stub = tmp / "colab"
+            stub.write_text(
+                "#!/bin/bash\n"
+                "for a in \"$@\"; do case \"$a\" in\n"
+                " usage) echo 'Current rate: 5.3 units/hour'; exit 0;;\n"
+                " stop) n=$(( $(cat \"$STUB/stops\" 2>/dev/null || echo 0) + 1 )); echo $n > \"$STUB/stops\";"
+                " [ $n -ge \"$OK_AT\" ] && exit 0; exit 1;;\n"
+                "esac; done\nexit 0\n")
+            stub.chmod(0o755)
+            env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp), "STUB": str(tmp), "ERRAND_HOME": str(tmp / "home"),
+                   "COLAB_BIN": str(stub), "ERRAND_STOP_PAUSE": "0"}
+            run = lambda ok_at: subprocess.run(
+                ["bash", str(SCRIPTS / "colab_job.sh"), str(ROOT / "examples/jobs/sound-effects.json")],
+                env={**env, "OK_AT": str(ok_at)}, capture_output=True, text=True, timeout=60)
+            r = run(6)
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertIn("runtime not confirmed stopped", r.stdout)
+            stopped = list((tmp / "home/results").glob("*/stopped"))
+            for _ in range(40):
+                if stopped:
+                    break
+                time.sleep(0.5)
+                stopped = list((tmp / "home/results").glob("*/stopped"))
+            self.assertTrue(stopped, "the watchdog never stopped the runtime")
+            self.assertEqual((tmp / "stops").read_text().strip(), "6")
+            # A stop that works the first time ends the watchdog: no more stops.
+            (tmp / "stops").unlink()
+            r = run(1)
+            self.assertNotIn("not confirmed", r.stdout)
+            time.sleep(7)
+            self.assertEqual((tmp / "stops").read_text().strip(), "1")
 
     def test_service_host_never_runs_job_commands(self):
         # The host packs, copies and polls; setup and command run only on the runtime.

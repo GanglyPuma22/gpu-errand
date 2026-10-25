@@ -48,7 +48,7 @@ What happens:
 3. It caps the runtime's life at `max_minutes` + 20 minutes or the unit ceiling, whichever comes first.
 4. It copies the job in, runs it, and brings `OUT_DIR` back.
 5. It checks every file against a SHA-256 list made on the runtime.
-6. It stops the runtime, also on error and at the cap.
+6. It stops the runtime, also on error and at the cap. If a stop fails, it keeps retrying for 30 minutes.
 
 The job's files land in `~/.gpu-errand/results/<id>-<time>/out/`, and the runner's logs sit beside that folder. Links and special files are dropped. With `RESULTS_REPO` set, they also go to branch `errand-results/<id>`.
 
@@ -57,7 +57,7 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | Done and verified. |
-| 1 | The job failed, or the runtime or a ceiling stopped it. |
+| 1 | The job failed, a ceiling stopped it, or the runtime was not confirmed stopped (then tell the person right away). |
 | 2 | The job was refused. |
 | 3 | Results not delivered. |
 | 4 | Results did not match the runtime's list. |

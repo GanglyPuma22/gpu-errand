@@ -113,12 +113,36 @@ CAP=$(( (MAXMIN + 20) * 60 ))
 # in $DEADLINE (seconds since the epoch), which ends any ssh call still hanging;
 # the unit ceiling below can only move that deadline earlier.
 DEADLINE=$RES/deadline; echo $(( T0 + CAP )) > "$DEADLINE"
-( exec 7>&-
+# One bounded stop attempt; success means the CLI confirmed the stop.
+PAUSE=${ERRAND_STOP_PAUSE:-10}   # seconds between stop tries (tests set 0)
+stop_once() { timeout 120 "${COLAB[@]}" stop -s "$SESSION" < /dev/null; }
+( exec 7>&-; trap '' HUP
   while [ "$(date +%s)" -lt "$(cat "$DEADLINE" 2> /dev/null || echo 0)" ]; do sleep 5; done
   echo "[errand $(date -u +%T)] watchdog: deadline reached $(( $(date +%s) - T0 )) s after the runtime started, stopping it" >> "$RES/driver.log"
-  "${COLAB[@]}" stop -s "$SESSION" > /dev/null 2>&1 ) &
+  # Keeps trying for about 30 minutes: a failed stop doesn't release the GPU.
+  for try in $(seq 30); do
+	stop_once > /dev/null 2>&1 && { touch "$RES/stopped"; echo "[errand $(date -u +%T)] watchdog: runtime stopped" >> "$RES/driver.log"; exit 0; }
+	sleep $(( PAUSE * 6 ))
+  done
+  echo "[errand $(date -u +%T)] watchdog: could not stop session $SESSION after 30 tries; stop it by hand: colab stop -s $SESSION" >> "$RES/driver.log" ) &
 WATCHDOG=$!
-trap 'kill "$WATCHDOG" 2> /dev/null; say "stopping runtime"; "${COLAB[@]}" stop -s "$SESSION" || true; rm -f "$RES/repo.tar"' EXIT
+# The watchdog stays armed until a stop succeeds. If cleanup can't stop the
+# runtime, it pulls the deadline to now and leaves the watchdog retrying.
+cleanup() {
+	local rc=$? try
+	rm -f "$RES/repo.tar"
+	say "stopping runtime"
+	for try in 1 2 3; do
+		[ -e "$RES/stopped" ] && { say "the watchdog already stopped it"; exit "$rc"; }
+		if stop_once; then kill "$WATCHDOG" 2> /dev/null; exit "$rc"; fi
+		say "stop failed (try $try)"; sleep $(( try * PAUSE ))
+	done
+	date +%s > "$DEADLINE"
+	say "WARNING: runtime not confirmed stopped; the watchdog keeps trying for 30 min (see driver.log). By hand: colab stop -s $SESSION"
+	[ "$rc" = 0 ] && rc=1
+	exit "$rc"
+}
+trap cleanup EXIT
 USAGE=$(timeout 60 "${COLAB[@]}" usage 2> /dev/null || true)
 echo "$USAGE" | head -5 >> "$RES/driver.log"
 RATE1=$(echo "$USAGE" | rate || true)
