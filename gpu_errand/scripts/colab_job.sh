@@ -55,7 +55,8 @@ if [ "${COLAB_SHARED_CONFIG:-0}" != 1 ]; then
 		say "colab: separate state file refused, using the CLI's default state"
 	fi
 fi
-say "colab: $("${COLAB[@]}" --version 2> /dev/null | head -1), auth ${COLAB_AUTH:-oauth2}"
+CVER=$("${COLAB[@]}" --version 2> /dev/null | head -1 || true)   # older CLIs have no --version
+say "colab:${CVER:+ $CVER,} auth ${COLAB_AUTH:-oauth2}"
 
 # --- 0. what runs, packed here (no .git, no credentials go to the runtime)
 RUNJOB=$JOBFILE
@@ -78,7 +79,8 @@ else
 	COMMIT=$(git -C "$MIRROR" rev-parse --verify -q "$REF^{commit}") || { say "ref $REF not found in $REPO: stop"; exit 1; }
 	git -C "$MIRROR" archive --format=tar "$COMMIT" > "$RES/repo.tar"
 fi
-say "job $ID: $REPO $REF @ $COMMIT ($(( $(stat -c %s "$RES/repo.tar") / 1048576 )) MB), $GPU, cap $MAXMIN min"
+AT="$REF @ $COMMIT"; [ "$REF" = "$COMMIT" ] && AT=$COMMIT
+say "job $ID: $REPO $AT ($(( $(stat -c %s "$RES/repo.tar") / 1048576 )) MB), $GPU, cap $MAXMIN min"
 
 # --- 1. runtime (the account holds a few GPUs at once; wait for a free one, no spend while waiting)
 cat > "$RES/ssh.cfg" <<CFG
@@ -204,8 +206,10 @@ ssh runtime "bash /content/job/runtime_display.sh $SCREEN_ARG" >> "$RES/driver.l
 # Start the job once: a retry after a dropped connection sees runner.pid and
 # only confirms the start.
 put 'cd /content/job && if [ ! -s runner.pid ]; then setsid nohup bash runtime_job.sh > runner.log 2>&1 < /dev/null & sleep 3; fi; [ -s runner.pid ]'
+POLLS=0
 while :; do
-	sleep 60
+	# Every 15 s for the first two minutes (short jobs), then every minute.
+	POLLS=$(( POLLS + 1 )); if [ "$POLLS" -le 8 ]; then sleep 15; else sleep 60; fi
 	P=$(ssh runtime 'tail -1 /content/job/progress.txt 2>/dev/null; [ -f /content/job/finished ] && echo RUNNER-FINISHED' || true)
 	echo "  $P" >> "$RES/driver.log"
 	case "$P" in *RUNNER-FINISHED) break ;; esac
@@ -241,7 +245,7 @@ fi
 [ "$VERIFIED" = 1 ] && say "results match the runtime's SHA-256 list" || say "results do NOT match the runtime's SHA-256 list (or it is missing)"
 say "runtime minutes: $(( ($(date +%s) - T0) / 60 ))"
 "${COLAB[@]}" usage 2> /dev/null | head -3 >> "$RES/driver.log" || true
-echo "build: $REPO $REF @ $COMMIT, $GPU, $(grep -m1 gpu= "$OUT/env.txt" 2>/dev/null || echo 'gpu line missing')" > "$RES/BUILD.txt"
+echo "build: $REPO $AT, $GPU, $(grep -m1 gpu= "$OUT/env.txt" 2>/dev/null || echo 'gpu line missing')" > "$RES/BUILD.txt"
 
 PUSHED=0; [ -n "${RESULTS_REPO:-}" ] || PUSHED=1   # no results repo: the local folder is the delivery
 # Per-file size on a results branch: 10 MB for repo jobs (clips are small), 95 MB
