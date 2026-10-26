@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: recipe
 title: Sound effects with Stable Audio Open on Colab
 permalink: /recipes/sound-effects-stable-audio-open-colab/
 description: Generate game sound effects from text with Stable Audio Open 1.0 on a Google Colab L4, from one job file, without putting your Hugging Face token on the runtime.
@@ -7,7 +7,7 @@ description: Generate game sound effects from text with Stable Audio Open 1.0 on
 
 The `stable-audio-open-sfx` recipe makes sound effects from text with [Stable Audio Open 1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0), through Diffusers. Each seed gives one effect, up to 47 seconds long, at 44.1 kHz stereo.
 
-**Measured:** three 5 s effects took 9 minutes on a Colab L4 and used 0.21 compute units, including setup and the 5 GB model download. Each effect took about 14 s to generate.
+In our runs, three 5 s effects took 9 minutes on a Colab L4 and used 0.21 compute units, including setup and the 5 GB model download. Each effect took about 14 s to generate.
 
 ## The job
 
@@ -45,7 +45,7 @@ In the results folder's `out/`:
 
 - Words like "heavy" don't guarantee weight. In our first batch a "heavy swing" came out light. Describe the sound itself ("deep, slow whoosh with a low rumble") and ask for two or three seeds.
 - Add "dry, close up" for game effects you'll mix yourself, and "no impact" when you want the swing alone.
-- Listen to every preview before you import anything. The receipt proves the files are valid, not that they fit.
+- Listen to every preview before you import anything. The receipt only proves the files are valid.
 
 ## License
 

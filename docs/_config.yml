@@ -2,12 +2,12 @@ title: GPU Errand
 description: Let Claude Code, Codex or any coding agent run jobs on a Google Colab GPU, with a hard spending cap and a receipt for every run.
 url: https://ganglypuma22.github.io
 baseurl: /gpu-errand
-theme: minima
 plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
-github_username: GanglyPuma22
-header_pages:
-  - recipes/game-music-ace-step-colab.md
-  - recipes/sound-effects-stable-audio-open-colab.md
-  - recipes/headless-godot-capture-gpu.md
+markdown: kramdown
+kramdown:
+  syntax_highlighter_opts:
+    disable: true
+exclude:
+  - DESIGN.md
