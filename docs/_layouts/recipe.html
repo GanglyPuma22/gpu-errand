@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+{% seo %}
+</head>
+<body class="recipe">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top soot recipe-top">
+  <a class="wordmark" href="{{ '/' | relative_url }}">GPU Errand</a>
+  <a class="top-link" href="https://github.com/GanglyPuma22/gpu-errand">GitHub</a>
+</header>
+<main id="main">
+  <div class="doc-head soot">
+    <div class="doc-body">
+      <h1 data-rise>{{ page.title }}</h1>
+      <p class="doc-lead" data-rise>{{ page.description }}</p>
+    </div>
+  </div>
+  <div class="doc">
+  <article class="doc-body">
+    {{ content | replace: '<pre', '<pre data-ui' }}
+    <p class="doc-back"><a href="{{ '/' | relative_url }}">← GPU Errand home</a></p>
+  </article>
+  </div>
+</main>
+<footer class="foot soot">
+  <p class="foot-what">GPU Errand, MIT licensed</p>
+  <nav class="foot-links" aria-label="Project">
+    <a href="https://github.com/GanglyPuma22/gpu-errand">GitHub</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand#quick-start">Quick start</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand/blob/main/skills/gpu-errand/SKILL.md">Agent skill</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand/blob/main/skills/gpu-errand/references/job-format.md">Job format</a>
+  </nav>
+  <p class="foot-year">2026. Not affiliated with Google.</p>
+</footer>
+<script src="{{ '/assets/site.js' | relative_url }}" defer></script>
+</body>
+</html>

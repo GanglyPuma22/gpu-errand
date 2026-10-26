@@ -1,0 +1,299 @@
+---
+layout: null
+title: GPU Errand
+description: Let Claude Code, Codex or any coding agent run a job on a Google Colab GPU from the command line, with a hard compute-unit cap, checked results and recipes for game music, sound effects and headless Godot capture.
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+{% seo title=false %}
+<title>GPU Errand: run coding-agent jobs on a Colab GPU with a spending cap</title>
+</head>
+<body class="home">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top soot">
+  <a class="wordmark" href="{{ '/' | relative_url }}">GPU Errand</a>
+  <a class="top-link" href="https://github.com/GanglyPuma22/gpu-errand">GitHub</a>
+</header>
+
+<main id="main">
+
+<section class="hero soot" aria-labelledby="title">
+  <div class="frame hero-grid">
+    <h1 id="title" data-rise>Send your agent<br>on a GPU errand.</h1>
+    <div class="hero-text">
+    <p class="lead" data-rise>GPU Errand lets Claude Code, Codex or any coding agent run a job on a Google Colab GPU. It never runs past the compute units you allowed, and it brings the results back with a receipt.</p>
+    <div class="install" data-rise>
+      <code id="install-cmd">pipx install git+https://github.com/GanglyPuma22/gpu-errand</code>
+      <button class="btn" type="button" data-copy="install-cmd" aria-label="Copy install command">Copy</button>
+    </div>
+    <p class="hero-link" data-rise><a href="https://github.com/GanglyPuma22/gpu-errand#quick-start">Read the quick start →</a></p>
+    </div>
+
+    <figure class="receipt" data-ui aria-label="Receipt of a real run">
+      <ol class="slip">
+        <li><span>hello-pr1</span><span>Tesla T4</span></li>
+        <li><span>account rate</span><span>2.61 units/h</span></li>
+        <li><span>cap from 0.1 units</span><span>137 s</span></li>
+        <li><span>copied in</span><span>9 s</span></li>
+        <li><span>job</span><span>exit 0</span></li>
+        <li><span>results</span><span>match SHA-256 list</span></li>
+        <li><span>runtime</span><span>stopped</span></li>
+        <li class="total"><span>spent</span><span>about 0.02 units</span></li>
+      </ol>
+      <figcaption>A real run on 26 October 2026, copied from its driver log.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="how paper" aria-labelledby="how-title">
+  <div class="frame how-grid">
+    <div class="steps">
+      <h2 id="how-title" class="h-sec" data-rise>How an errand runs</h2>
+
+      <article class="step" data-step="0">
+        <p class="step-say">Your agent writes the job.</p>
+        <p class="step-more">One JSON file: the commit to run, the command, the GPU and the most it may spend.</p>
+        <div class="frag" data-ui>
+<pre><code>{
+  "schema": 1,
+  "id": "hello-pr1",
+  "type": "shell",
+  "repo": "GanglyPuma22/gpu-errand",
+  "ref": "79d34a6",
+  "command": "nvidia-smi &gt; $OUT_DIR/gpu.txt",
+  "gpu": "T4",
+  "max_minutes": 3,
+  "max_units": 0.1,
+  "max_rate": 3
+}</code></pre>
+        </div>
+      </article>
+
+      <article class="step" data-step="1">
+        <p class="step-say">Then you read the plan and say go.</p>
+        <p class="step-more"><code>gpu-errand plan</code> prints every step with its caps. Nothing is spent before you agree.</p>
+        <div class="frag" data-ui>
+<pre><code><b>$ gpu-errand plan hello-pr1.json</b>
+host: git fetch, git archive 79d34a6
+      (no .git, no credentials)
+host: colab new --gpu T4
+host: read the hourly rate; refuse an
+      unknown rate or one above 3 units/h;
+      cap the runtime at 3 min + 20
+      or 0.1 units, whichever comes first
+runtime: run: nvidia-smi …
+host: check every file, stop the runtime
+
+<mark>agent: Go? This spends up to 0.1 units.</mark></code></pre>
+        </div>
+      </article>
+
+      <article class="step" data-step="2">
+        <p class="step-say">Your machine runs it on Colab.</p>
+        <p class="step-more">It waits for a free GPU, reads the rate, and stops the runtime at the cap, even if something hangs.</p>
+        <div class="frag" data-ui>
+<pre><code><b>$ gpu-errand run hello-pr1.json</b>
+04:16:21 job hello-pr1: T4, cap 3 min
+04:16:26 rate: account 2.61 units/hour
+04:16:26 cap: 137 s after the runtime
+         started, from the 0.1 unit ceiling
+04:16:35 copied in after 9 s
+         Tesla T4, 15360 MiB
+04:16:45 done</code></pre>
+        </div>
+      </article>
+
+      <article class="step" data-step="3">
+        <p class="step-say">The results come home with a receipt.</p>
+        <p class="step-more">Every file is checked against the list the runtime made. Then the GPU is shut off.</p>
+        <div class="frag" data-ui>
+<pre><code>04:17:44 results match the runtime's
+         SHA-256 list
+04:17:45 job hello-pr1: exit 0
+04:17:45 stopping runtime
+
+<b>results/hello-pr1-20261026T041617Z/out/</b>
+  gpu.txt        Tesla T4
+  commit.txt     79d34a6
+  runner.json    run_exit 0
+  MANIFEST.sha256</code></pre>
+        </div>
+      </article>
+    </div>
+    <div class="stage" aria-hidden="true"></div>
+  </div>
+</section>
+
+<section class="safe paper" aria-labelledby="safe-title">
+  <div class="frame">
+    <h2 id="safe-title" class="h-sec" data-rise>Safe to hand to an agent</h2>
+
+    <div class="module" id="cap">
+      <div class="panel calc" data-ui>
+        <form class="calc-form" onsubmit="return false">
+          <fieldset>
+            <legend>GPU</legend>
+            <label><input type="radio" name="gpu" value="1.07" checked> T4</label>
+            <label><input type="radio" name="gpu" value="1.54"> L4</label>
+            <label><input type="radio" name="gpu" value="5.3"> A100</label>
+          </fieldset>
+          <label class="range"><code>max_units</code> <output id="units-out">0.1</output>
+            <input id="units" type="range" min="0.05" max="2" step="0.05" value="0.1">
+          </label>
+          <label class="range"><code>max_minutes</code> <output id="mins-out">3</output>
+            <input id="mins" type="range" min="1" max="240" step="1" value="3">
+          </label>
+        </form>
+        <p class="calc-result" id="calc-result" aria-live="polite">On a T4 at 1.07 units an hour, the runtime is stopped after 5 min 36 s, by the unit cap. It can spend at most 0.1 units, about 1 cent.</p>
+      </div>
+      <div class="mod-text">
+        <h3>A cap that holds</h3>
+        <p>Once the GPU is granted, the runner reads the account's hourly rate. It refuses an unknown rate or one above <code>max_rate</code>, then stops the runtime at the time cap or the unit cap, whichever comes first.</p>
+        <p>If a stop fails, it keeps trying for 30 minutes. Try the numbers: the rates are ones we saw on one Pro account in October 2026, and the runner reads yours.</p>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="panel" data-ui>
+<pre><code><b>$ cat out/commit.txt</b>
+79d34a6cdbd263626dbad2608f61aacf8b3a7de7
+
+<b>$ sha256sum out/commit.txt</b>
+3c5dcdad592828e4ffc6e5ee19781f42
+22f3d8c93e28428a3c1ba181a6035fae
+
+host: results match the runtime's
+      SHA-256 list</code></pre>
+      </div>
+      <div class="mod-text">
+        <h3>Results you can check</h3>
+        <p>The runtime lists every output with its SHA-256 before anything leaves. Your machine checks each file against that list, and drops links and special files.</p>
+        <p>Model runs add <code>receipt.json</code> with each output's length, peak and loudness. A silent or broken file fails the run.</p>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="panel" data-ui>
+<pre><code>sent to the runtime
+  repo.tar          git archive, no .git
+  runtime_job.sh
+  runtime_display.sh
+
+kept on your machine
+  Colab login, Hugging Face token,
+  SSH keys, everything else</code></pre>
+      </div>
+      <div class="mod-text">
+        <h3>Nothing secret leaves home</h3>
+        <p>Only the job's commit and two scripts go to the runtime. Gated Hugging Face weights come through short-lived download links your machine makes, so the token never travels.</p>
+        <p>The job file refuses environment variables that look like keys or passwords.</p>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="panel" data-ui>
+<pre><code><b>$ gpu-errand service <mark>go</mark></b>
+[service] go typed
+[service] start: you/jobs:errand-queue,
+          1 at once, 3 jobs, 2 h
+          repos: you/game  refs: main
+[service] launched sfx-batch-2 (1 of 3)</code></pre>
+      </div>
+      <div class="mod-text">
+        <h3>Your go, every time</h3>
+        <p>The agent skill shows you the plan and the cap, then waits. A go covers that job and those caps, nothing more.</p>
+        <p>For a standing queue, agents push job files to a branch of a private repo. Your machine works through them only after you type <code>go</code>, inside the bounds you set.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="proof paper-2" aria-labelledby="proof-title">
+  <div class="frame">
+  <h2 id="proof-title" class="h-big" data-rise>Measured <span>runs</span></h2>
+  <table class="runs" data-rise>
+    <caption class="vh">Runs of the GPU Errand runner on Colab, with time and compute units used</caption>
+    <thead><tr><th scope="col">Date</th><th scope="col">Job</th><th scope="col">GPU and time</th><th scope="col">Units</th></tr></thead>
+    <tbody>
+      <tr><td>26 Oct 2026</td><td>GPU check, the hello job above</td><td>T4, about 1.5 min</td><td>about 0.02</td></tr>
+      <tr><td>23 Oct 2026</td><td>60 s music cue and a looping version</td><td>A100, 5 min</td><td>0.44</td></tr>
+      <tr><td></td><td>3 sound effects, 5 s each</td><td>L4, 9 min</td><td>0.21</td></tr>
+      <tr><td></td><td>2 Godot gameplay clips</td><td>L4, 3.3 min</td><td>about 0.02</td></tr>
+    </tbody>
+  </table>
+  <p class="note" data-rise>Colab sold 100 compute units for about $10 when these ran, so each one cost a few cents. Times include starting the GPU and copying results back.</p>
+  </div>
+</section>
+
+<section class="kinds paper" aria-labelledby="kinds-title">
+  <div class="frame">
+    <h2 id="kinds-title" class="h-sec" data-rise>What it can run</h2>
+    <div class="kinds-list">
+      <div>
+      <p class="group" data-rise>Recipes</p>
+      <ul class="rows" data-rise>
+        <li><a href="{{ '/recipes/game-music-ace-step-colab/' | relative_url }}">Game music with ACE-Step 1.5</a><span>A100</span></li>
+        <li><a href="{{ '/recipes/sound-effects-stable-audio-open-colab/' | relative_url }}">Sound effects with Stable Audio Open</a><span>L4</span></li>
+        <li><a href="{{ '/recipes/headless-godot-capture-gpu/' | relative_url }}">Godot gameplay clips with no screen</a><span>L4</span></li>
+      </ul>
+      </div>
+      <div>
+      <p class="group" data-rise>Job types</p>
+      <ul class="rows" data-rise>
+        <li><span class="name"><code>shell</code>, any command from a git repository</span><span>no screen</span></li>
+        <li><span class="name"><code>godot-capture</code>, a game's own capture command</span><span>Xvfb and Vulkan</span></li>
+        <li><span class="name"><code>model-run</code>, a shipped recipe</span><span>pinned models</span></li>
+      </ul>
+      </div>
+      <div>
+      <p class="group" data-rise>Agents</p>
+      <ul class="rows" data-rise>
+        <li><span class="name">Claude Code</span><span>plugin</span></li>
+        <li><span class="name">Codex</span><span>skill folder</span></li>
+        <li><span class="name">Anything that runs a shell command</span><span>CLI</span></li>
+      </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="faq paper" aria-labelledby="faq-title">
+  <div class="frame">
+  <h2 id="faq-title" class="h-sec" data-rise>Questions</h2>
+  <div class="faq-text" data-rise>
+    <p><b>Is this a Google product?</b> No. It's an independent open-source tool that drives Google's own <a href="https://github.com/googlecolab/google-colab-cli">Colab CLI</a>.</p>
+    <p><b>Does it work on the free Colab tier?</b> No. Colab allows remote shells only on paid accounts with compute units left.</p>
+    <p><b>How is it different from Modal, RunPod or SkyPilot?</b> Those rent GPUs by the second. GPU Errand is for people who already pay for Colab and want an agent to use those units safely.</p>
+    <p><b>Which agents does it work with?</b> Claude Code through the plugin, Codex through the skill folder, and anything else that can run a shell command.</p>
+    <p><b>Can my agent raise its own cap?</b> No. The cap is in the job you approved, and a go covers that job only. On a failure the skill reports back instead of retrying.</p>
+    <p><b>What does the host need?</b> Linux, macOS or WSL with git, ssh, Python 3.9 or newer, and the Colab CLI signed in. The CLI doesn't run on plain Windows.</p>
+    <p><b>Can a cloud agent use it?</b> Yes, through the queue. It pushes a job to a private repo and reads the results branch later, while your machine does the running.</p>
+    <p><b>Who checks the model licenses?</b> You do. Stable Audio Open uses the Stability AI Community License, and ACE-Step lists its terms on its repository.</p>
+  </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot soot">
+  <p class="foot-what">GPU Errand, MIT licensed</p>
+  <nav class="foot-links" aria-label="Project">
+    <a href="https://github.com/GanglyPuma22/gpu-errand">GitHub</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand#quick-start">Quick start</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand/blob/main/skills/gpu-errand/SKILL.md">Agent skill</a>
+    <a href="https://github.com/GanglyPuma22/gpu-errand/blob/main/skills/gpu-errand/references/job-format.md">Job format</a>
+  </nav>
+  <p class="foot-year">2026. Not affiliated with Google.</p>
+</footer>
+
+<script src="{{ '/assets/site.js' | relative_url }}" defer></script>
+</body>
+</html>

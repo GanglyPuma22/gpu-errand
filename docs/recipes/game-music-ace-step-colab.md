@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: recipe
 title: Game music with ACE-Step on Colab
 permalink: /recipes/game-music-ace-step-colab/
 description: Generate instrumental game music and seamless loops with ACE-Step 1.5 on a Google Colab A100, from one job file, with a compute-unit cap and a receipt.

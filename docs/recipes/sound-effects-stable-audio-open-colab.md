@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: recipe
 title: Sound effects with Stable Audio Open on Colab
 permalink: /recipes/sound-effects-stable-audio-open-colab/
 description: Generate game sound effects from text with Stable Audio Open 1.0 on a Google Colab L4, from one job file, without putting your Hugging Face token on the runtime.

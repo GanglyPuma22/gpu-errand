@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: recipe
 title: Headless Godot capture on a cloud GPU
 permalink: /recipes/headless-godot-capture-gpu/
 description: Record Godot gameplay clips and stills on a Google Colab GPU with no screen attached, using a godot-capture job, a virtual display and Vulkan on the NVIDIA driver.
