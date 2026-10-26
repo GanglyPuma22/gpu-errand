@@ -64,10 +64,20 @@
       frags.forEach(function (f, j) { f.classList.toggle('on', i === j); });
     };
     show(0);
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) show(steps.indexOf(e.target)); });
-    }, { rootMargin: '-45% 0px -45% 0px' });
-    steps.forEach(function (s) { io.observe(s); });
+    // A thin band across the middle of the viewport, in pixels from its height.
+    var io, watch = function () {
+      if (io) io.disconnect();
+      var band = Math.round(window.innerHeight * 0.45) + 'px';
+      io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) show(steps.indexOf(e.target)); });
+      }, { rootMargin: '-' + band + ' 0px -' + band + ' 0px' });
+      steps.forEach(function (s) { io.observe(s); });
+    };
+    watch();
+    var lastH = window.innerHeight;
+    window.addEventListener('resize', function () {
+      if (window.innerHeight !== lastH) { lastH = window.innerHeight; watch(); }
+    });
   }
 
   // Entrances, once per element.
