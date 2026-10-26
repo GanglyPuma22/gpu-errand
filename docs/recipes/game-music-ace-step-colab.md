@@ -2,12 +2,12 @@
 layout: recipe
 title: Game music with ACE-Step on Colab
 permalink: /recipes/game-music-ace-step-colab/
-description: Generate instrumental game music and seamless loops with ACE-Step 1.5 on a Google Colab A100, from one job file, with a compute-unit cap and a receipt.
+description: Generate instrumental game music and music loops with ACE-Step 1.5 on a Google Colab A100, from one job file, with a compute-unit cap and a receipt.
 ---
 
 The `ace-step-music` recipe makes instrumental tracks from a text description with [ACE-Step 1.5](https://github.com/ace-step/ACE-Step-1.5). You can ask for a crossfaded loop as well, so the end runs back into the start for in-game music. Each seed gives one track.
 
-**Measured:** one 60 s cue plus a 52 s loop took 5 minutes on a Colab A100 and used 0.44 compute units, including setup. A batch of five 3-minute tracks took about 97 s per track after 6 minutes of setup (1.49 units). Peak GPU memory was about 22 GB, so it needs an A100; an L4 is not offered.
+In our runs, one 60 s cue plus a 52 s loop took 5 minutes on a Colab A100 and used 0.44 compute units, including setup. A batch of five 3-minute tracks took about 97 s per track after 6 minutes of setup (1.49 units). Peak GPU memory was about 22 GB, so it needs an A100; an L4 is not offered.
 
 ## The job
 
@@ -43,9 +43,9 @@ In the results folder's `out/`:
 
 ## Tips from our runs
 
-- Describe the use, not just the genre: "no big intro or final cadence; loopable" gets music that loops well.
+- Say how the music will be used as well as its genre. "No big intro or final cadence; loopable" got us music that loops well.
 - Pin `bpm` and `keyscale` so cues for the same game fit together.
-- Listen to the seam file before you use a loop. The receipt checks files, not taste.
+- Listen to the seam file before you use a loop. The receipt checks that the files are valid. It can't tell you whether the loop sounds right.
 - Several seeds per cue give you takes to choose from; the model loads once per job, so extra seeds are cheap.
 
 ## License

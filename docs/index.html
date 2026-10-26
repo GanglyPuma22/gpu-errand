@@ -155,9 +155,9 @@ host: check every file, stop the runtime
         <p class="calc-result" id="calc-result" aria-live="polite">On a T4 at 1.07 units an hour, the runtime is stopped after 5 min 36 s, by the unit cap. It can spend at most 0.1 units, about 1 cent.</p>
       </div>
       <div class="mod-text">
-        <h3>A cap that holds</h3>
+        <h3>A hard spending cap</h3>
         <p>Once the GPU is granted, the runner reads the account's hourly rate. It refuses an unknown rate or one above <code>max_rate</code>, then stops the runtime at the time cap or the unit cap, whichever comes first.</p>
-        <p>If a stop fails, it keeps trying for 30 minutes. Try the numbers: the rates are ones we saw on one Pro account in October 2026, and the runner reads yours.</p>
+        <p>If a stop fails, it keeps trying for 30 minutes. The calculator uses rates we saw on one Pro account in October 2026; the runner reads your account's own rate.</p>
       </div>
     </div>
 
@@ -174,7 +174,7 @@ host: results match the runtime's
       SHA-256 list</code></pre>
       </div>
       <div class="mod-text">
-        <h3>Results you can check</h3>
+        <h3>Checksums on every file</h3>
         <p>The runtime lists every output with its SHA-256 before anything leaves. Your machine checks each file against that list, and drops links and special files.</p>
         <p>Model runs add <code>receipt.json</code> with each output's length, peak and loudness. A silent or broken file fails the run.</p>
       </div>
@@ -192,7 +192,7 @@ kept on your machine
   SSH keys, everything else</code></pre>
       </div>
       <div class="mod-text">
-        <h3>Nothing secret leaves home</h3>
+        <h3>Your keys stay on your machine</h3>
         <p>Only the job's commit and two scripts go to the runtime. Gated Hugging Face weights come through short-lived download links your machine makes, so the token never travels.</p>
         <p>The job file refuses environment variables that look like keys or passwords.</p>
       </div>
@@ -208,8 +208,8 @@ kept on your machine
 [service] launched sfx-batch-2 (1 of 3)</code></pre>
       </div>
       <div class="mod-text">
-        <h3>Your go, every time</h3>
-        <p>The agent skill shows you the plan and the cap, then waits. A go covers that job and those caps, nothing more.</p>
+        <h3>You approve every job</h3>
+        <p>The agent skill shows you the plan and the cap, then waits. A go covers only that job and its caps.</p>
         <p>For a standing queue, agents push job files to a branch of a private repo. Your machine works through them only after you type <code>go</code>, inside the bounds you set.</p>
       </div>
     </div>
@@ -229,7 +229,7 @@ kept on your machine
       <tr><td></td><td>2 Godot gameplay clips</td><td>L4, 3.3 min</td><td>about 0.02</td></tr>
     </tbody>
   </table>
-  <p class="note" data-rise>Colab sold 100 compute units for about $10 when these ran, so each one cost a few cents. Times include starting the GPU and copying results back.</p>
+  <p class="note" data-rise>Colab sold 100 compute units for about $10 when these ran, so each run cost a few cents or less. Times include starting the GPU and copying results back.</p>
   </div>
 </section>
 

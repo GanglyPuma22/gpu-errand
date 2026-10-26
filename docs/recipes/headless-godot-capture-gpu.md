@@ -7,7 +7,7 @@ description: Record Godot gameplay clips and stills on a Google Colab GPU with n
 
 A `godot-capture` job runs your game's own capture command on a Colab GPU. The runner gives it a virtual screen (Xvfb) with Vulkan on the runtime's NVIDIA GPU, so Godot's Forward+ renderer draws as it would on a desktop. Use it for review clips, still frames from fixed cameras, or comparing two builds.
 
-**Measured:** two gameplay clips of a small Godot 4.4 game took 3.3 minutes on a Colab L4, about 0.02 compute units. The `gpu=nvidia` line in the results confirmed the GPU drew the frames.
+In our runs, two gameplay clips of a small Godot 4.4 game took 3.3 minutes on a Colab L4, about 0.02 compute units. The `gpu=nvidia` line in the results confirmed the GPU drew the frames.
 
 ## The job
 
@@ -29,8 +29,8 @@ The runner packs exactly the commit `ref` names, so push first. `$GODOT` points 
 
 ## Things to know
 
-- **Use the movie writer.** `--write-movie` with `--fixed-fps` advances game time one step per frame. Clips play at normal speed and the sound stays in sync, however slow the drawing is.
-- **Don't benchmark on it.** Presenting to the virtual screen fails on Colab (VkResult -13), which stalls each frame. Frames still render correctly, but frame times and GPU timers can't be trusted.
-- **Wall-clock effects drift.** Anything driven by real time rather than game time (some glows, timers) runs at the wrong speed in a fixed-step recording.
-- **No GPU at all?** `gpu-errand here job.json <checkout> <out>` runs the same job on your machine with a software Vulkan driver (`apt install xvfb ffmpeg mesa-vulkan-drivers`). It's free and correct, just slow: about 2 frames a second at 1280x720 on 4 cores.
-- **Skip drawing while you wait.** If your capture script fast-forwards to a moment, turn off rendering until shortly before it. In Godot 4.4, `RenderingServer.render_loop_enabled = false` together with `get_tree().root.disable_3d = true` took a software-rendered frame from about 270 ms to 25 ms.
+- Use the movie writer. `--write-movie` with `--fixed-fps` advances game time one step per frame. Clips play at normal speed and the sound stays in sync, however slow the drawing is.
+- Don't benchmark on it. Presenting to the virtual screen fails on Colab (VkResult -13), which stalls each frame. Frames still render correctly, but frame times and GPU timers can't be trusted.
+- Effects that follow the wall clock drift. Anything driven by real time rather than game time (some glows, timers) runs at the wrong speed in a fixed-step recording.
+- With no GPU at all, `gpu-errand here job.json <checkout> <out>` runs the same job on your machine with a software Vulkan driver (`apt install xvfb ffmpeg mesa-vulkan-drivers`). It's free and the frames are correct, but it's slow: about 2 frames a second at 1280x720 on 4 cores.
+- Skip drawing while you wait. If your capture script fast-forwards to a moment, turn off rendering until shortly before it. In Godot 4.4, `RenderingServer.render_loop_enabled = false` together with `get_tree().root.disable_3d = true` took a software-rendered frame from about 270 ms to 25 ms.
