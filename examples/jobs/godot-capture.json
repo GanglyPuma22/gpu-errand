@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "id": "godot-clips-1",
+  "type": "godot-capture",
+  "repo": "your-name/your-game",
+  "ref": "main",
+  "godot": {
+    "url": "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip",
+    "sha256": "d6e382fb531019f85630c1f485a561a0d20c4a2344b6c3847735cfee7da812aa"
+  },
+  "setup": "\"$GODOT\" --headless --import",
+  "command": "\"$GODOT\" --path . --write-movie \"$OUT_DIR/clip.avi\" --fixed-fps 30 --quit-after 300 res://tools/capture_scene.tscn",
+  "gpu": "L4",
+  "max_minutes": 30,
+  "results_max_mb": 200
+}

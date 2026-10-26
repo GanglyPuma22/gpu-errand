@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-errand"
+version = "0.1.0"
+description = "Let a coding agent run jobs on a Google Colab GPU, with a hard compute-unit cap and a receipt for every run."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["google-colab", "colab", "gpu", "claude-code", "codex", "agent-skills", "ai-agents", "compute-units", "ace-step", "stable-audio-open", "game-audio", "godot", "headless-rendering", "job-queue"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Sound/Audio",
+  "Topic :: Software Development :: Testing",
+  "Topic :: System :: Distributed Computing",
+]
+
+[project.urls]
+Homepage = "https://ganglypuma22.github.io/gpu-errand/"
+Source = "https://github.com/GanglyPuma22/gpu-errand"
+Issues = "https://github.com/GanglyPuma22/gpu-errand/issues"
+
+[project.scripts]
+gpu-errand = "gpu_errand.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gpu_errand*"]
+
+[tool.setuptools.package-data]
+gpu_errand = ["scripts/*", "recipes/*/*"]

@@ -1,0 +1,18 @@
+{
+  "name": "gpu-errand",
+  "version": "0.1.0",
+  "description": "Let your coding agent run jobs on a Google Colab GPU with a hard compute-unit cap, checked results and a receipt for every run. Includes recipes for game music (ACE-Step), sound effects (Stable Audio Open) and headless Godot captures.",
+  "author": {
+    "name": "GPU Errand contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "GPU Errand",
+    "shortDescription": "Run a job on a Colab GPU with a spending cap.",
+    "longDescription": "Send a job to a Google Colab GPU from your agent: a repository command, a headless Godot capture, or a music or sound-effects model. It stops at your compute-unit cap and brings results back with checksums and a receipt.",
+    "developerName": "GPU Errand contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use gpu-errand to plan a Colab GPU job and show me the plan and its unit cap before anything runs."
+  }
+}

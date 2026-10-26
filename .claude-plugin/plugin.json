@@ -1,0 +1,27 @@
+{
+  "name": "gpu-errand",
+  "version": "0.1.0",
+  "description": "Let your coding agent run jobs on a Google Colab GPU with a hard compute-unit cap, checked results and a receipt for every run. Includes recipes for game music (ACE-Step), sound effects (Stable Audio Open) and headless Godot captures.",
+  "author": {
+    "name": "GPU Errand contributors"
+  },
+  "homepage": "https://ganglypuma22.github.io/gpu-errand/",
+  "repository": "https://github.com/GanglyPuma22/gpu-errand",
+  "license": "MIT",
+  "keywords": [
+    "google-colab",
+    "colab",
+    "gpu",
+    "claude-code",
+    "codex",
+    "agent-skills",
+    "ai-agents",
+    "compute-units",
+    "ace-step",
+    "stable-audio-open",
+    "game-audio",
+    "godot",
+    "headless-rendering",
+    "job-queue"
+  ]
+}
