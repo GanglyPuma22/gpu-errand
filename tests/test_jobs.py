@@ -296,6 +296,7 @@ class CliAndScriptsTests(unittest.TestCase):
                 "for a in \"$@\"; do case \"$a\" in\n"
                 " usage) if [ -e \"$STUB/new.txt\" ]; then echo 'Current rate: 2.04 units/hour'; else echo 'Current rate: 1.94 units/hour'; fi; exit 0;;\n"
                 " new) echo \"$*\" >> \"$STUB/new.txt\"; exit 0;;\n"
+                " sessions) echo 'other-l4 L4 running'; [ -e \"$STUB/new.txt\" ] && [ -e \"$STUB/churn\" ] && echo 'other-a100 A100 running'; exit 0;;\n"
                 " stop) exit 0;;\n"
                 "esac; done\nexit 0\n")
             stub.chmod(0o755)
@@ -312,6 +313,14 @@ class CliAndScriptsTests(unittest.TestCase):
             self.assertIn("--high-mem", new)
             self.assertIn("ceilings use 0.100 units/hour", r.stdout)
             self.assertIn("over the job's max_rate 0.05", r.stdout)
+            # Another session started meanwhile: the difference is not this
+            # session's alone, so the ceiling falls back to the account rate.
+            (tmp / "new.txt").unlink()
+            (tmp / "churn").touch()
+            r = subprocess.run(["bash", str(SCRIPTS / "colab_job.sh"), str(jf)], env=env,
+                               capture_output=True, text=True, timeout=60)
+            self.assertIn("other sessions changed or unknown", r.stdout)
+            self.assertIn("ceilings use 2.04 units/hour", r.stdout)
 
     def test_service_host_never_runs_job_commands(self):
         # The host packs, copies and polls; setup and command run only on the runtime.
