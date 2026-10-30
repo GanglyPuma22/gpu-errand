@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "id": "hello-cpu",
+  "type": "shell",
+  "repo": "your-name/your-repo",
+  "ref": "main",
+  "command": "{ nproc; free -g; lscpu | grep 'Model name'; } > \"$OUT_DIR/cpu.txt\"",
+  "gpu": "CPU",
+  "high_mem": true,
+  "max_minutes": 5,
+  "max_units": 0.05,
+  "max_rate": 0.5,
+  "results_max_mb": 5
+}

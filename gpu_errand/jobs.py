@@ -52,6 +52,11 @@ MAX_UNITS = 20
 RESULTS_PREFIX = "errand-results/"
 WHERE = ("here", "colab")
 GPUS = ("L4", "T4", "A100")
+# What a shell or godot-capture job may ask for: a GPU, or "CPU" for a runtime
+# with no accelerator. A CPU runtime costs a small fraction of a GPU's units an
+# hour, so work that never touches the GPU (tests, headless sims, benches)
+# belongs there.
+RUNTIMES = GPUS + ("CPU",)
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,200}$")
@@ -105,8 +110,10 @@ def validate(job, allow_repos=None, allow_refs=None):
     if where not in WHERE:
         errors.append(f"where must be one of {', '.join(WHERE)}")
     gpu = job.get("gpu", "L4")
-    if gpu not in GPUS:
-        errors.append(f"gpu must be one of {', '.join(GPUS)}")
+    if gpu not in RUNTIMES:
+        errors.append(f"gpu must be one of {', '.join(RUNTIMES)}")
+    if "high_mem" in job and not isinstance(job["high_mem"], bool):
+        errors.append("high_mem must be true or false")
     minutes = job.get("max_minutes")
     if not isinstance(minutes, (int, float)) or isinstance(minutes, bool) or not 1 <= minutes <= MAX_MINUTES:
         errors.append(f"max_minutes must be a number from 1 to {MAX_MINUTES}")
@@ -120,7 +127,7 @@ def validate(job, allow_repos=None, allow_refs=None):
         if "max_units" not in job:
             errors.append("max_rate needs max_units")
         else:
-            _number(job, "max_rate", 0.1, 50, errors)
+            _number(job, "max_rate", 0.01, 50, errors)
     godot = job.get("godot")
     if godot is not None:
         if not isinstance(godot, dict) or not isinstance(godot.get("url"), str) or not godot["url"].startswith("https://"):
@@ -173,6 +180,8 @@ def _validate_model_run(job):
     rate = job.get("max_rate")
     if rate is not None:
         _number(job, "max_rate", 0.1, 50, errors)
+    if "high_mem" in job and not isinstance(job["high_mem"], bool):
+        errors.append("high_mem must be true or false")
     name = job.get("recipe")
     known = recipes()
     if name not in known:
@@ -252,6 +261,16 @@ def parse_queue(text):
     return jobs, stop
 
 
+def colab_new(job, default_gpu="L4"):
+    """The colab CLI call that makes this job's runtime: no accelerator flag
+    for "CPU", and --high-mem when the job asks for High-RAM."""
+    gpu = job.get("gpu", default_gpu)
+    words = ["colab new"] + ([] if gpu == "CPU" else [f"--gpu {gpu}"])
+    if job.get("high_mem"):
+        words.append("--high-mem")
+    return " ".join(words)
+
+
 def _rate_rule(job):
     if "max_rate" in job:
         return f"refuse an unknown rate or one above {job['max_rate']} units/hour"
@@ -273,7 +292,7 @@ def plan(job, where=None):
         if recipe.get("gated"):
             steps.append(f"host: resolve short-lived download links for {recipe['model']['repo']} with the host's Hugging Face login (the token never leaves the host)")
         steps += [
-            f"host: colab new --gpu {gpu}; read the hourly rate; {_rate_rule(job)}; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first",
+            f"host: {colab_new(job, gpu)}; read the hourly rate; {_rate_rule(job)}; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first",
             "runtime: setup: " + recipe.get("setup_summary", "the recipe's setup.sh"),
             "runtime: run: " + recipe.get("run_summary", "the recipe's run.sh"),
             "host: copy OUT_DIR back, check every file against the runtime's SHA-256 list, stop the runtime, push results",
@@ -282,15 +301,17 @@ def plan(job, where=None):
     if where == "colab":
         steps += [
             f"host: git fetch {job['repo']} {job['ref']}; git archive that commit (no .git, no credentials)",
-            f"host: colab new --gpu {job.get('gpu', 'L4')} (waits for a free GPU; the account's limit applies)",
+            f"host: {colab_new(job)} (waits for a free runtime; the account's limit applies)",
             (f"host: read the hourly rate; {_rate_rule(job)}; cap the runtime at {job['max_minutes']} min + 20 or {job['max_units']} units, whichever comes first"
              if "max_units" in job else f"host: cap the runtime at {job['max_minutes']} min + 20 (no unit ceiling set)"),
             "host: copy the archive and the runtime scripts in over colab ssh",
         ]
-        if job["type"] == "godot-capture":
+        if job["type"] == "godot-capture" and job.get("gpu", "L4") == "CPU":
+            steps.append("runtime: install xvfb, ffmpeg and Vulkan loader; start Xvfb :99; no GPU, so the software driver (lavapipe) draws")
+        elif job["type"] == "godot-capture":
             steps.append("runtime: install xvfb, ffmpeg and Vulkan loader; start Xvfb :99; pick the NVIDIA Vulkan driver")
         else:
-            steps.append("runtime: record the GPU (no screen)")
+            steps.append("runtime: record the CPU, memory and GPU, if any (no screen)")
     else:
         steps += [
             f"here: use the checkout of {job['repo']} at {job['ref']} given as CHECKOUT",

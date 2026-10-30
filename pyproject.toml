@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gpu-errand"
-version = "0.1.0"
+version = "0.2.0"
 description = "Let a coding agent run jobs on a Google Colab GPU, with a hard compute-unit cap and a receipt for every run."
 readme = "README.md"
 requires-python = ">=3.9"
