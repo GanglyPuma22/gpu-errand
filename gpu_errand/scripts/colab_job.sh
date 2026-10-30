@@ -1,6 +1,7 @@
 #!/bin/bash
 # Host side (your always-on machine: a Linux box, a server, WSL): run one job
-# on a Colab GPU runtime from start to finish, then stop the runtime.
+# on a Colab runtime (a GPU, or a CPU-only runtime for "gpu": "CPU") from
+# start to finish, then stop the runtime.
 #   colab_job.sh JOB.json        (or: gpu-errand run JOB.json)
 # Needs: the colab CLI signed in to a paid Colab account, git access to the
 # job's repo (GH, default git@github.com:), python3, ssh.
@@ -38,6 +39,10 @@ else
 	REPO=$(J 'print(d["repo"])'); REF=$(J 'print(d["ref"])'); GPU=$(J 'print(d.get("gpu","L4"))')
 	MAXUNITS=$(J 'print(d.get("max_units",""))'); MAXRATE=$(J 'print(d.get("max_rate",""))')
 fi
+# The runtime to ask for: "CPU" means no accelerator flag (a CPU-only runtime);
+# high_mem adds the CLI's High-RAM option.
+NEW=(--gpu "$GPU"); [ "$GPU" = CPU ] && NEW=()
+[ "$(J 'print(1 if d.get("high_mem") else 0)')" = 1 ] && NEW+=(--high-mem)
 SESSION=${COLAB_SESSION:-errand-$ID}
 mkdir -p "$WORK/results" "$WORK/repos"
 RES=$(mktemp -d "$WORK/results/$ID-$(date -u +%Y%m%dT%H%M%SZ)-XXXX")   # fresh per run, even for a reused id
@@ -80,7 +85,7 @@ else
 	git -C "$MIRROR" archive --format=tar "$COMMIT" > "$RES/repo.tar"
 fi
 AT="$REF @ $COMMIT"; [ "$REF" = "$COMMIT" ] && AT=$COMMIT
-say "job $ID: $REPO $AT ($(( $(stat -c %s "$RES/repo.tar") / 1048576 )) MB), $GPU, cap $MAXMIN min"
+say "job $ID: $REPO $AT ($(( $(stat -c %s "$RES/repo.tar") / 1048576 )) MB), $GPU${NEW[*]:+ (colab new ${NEW[*]})}, cap $MAXMIN min${MAXUNITS:+, ceiling $MAXUNITS units}"
 
 # --- 1. runtime (the account holds a few GPUs at once; wait for a free one, no spend while waiting)
 cat > "$RES/ssh.cfg" <<CFG
@@ -101,10 +106,15 @@ rate() { python3 -c '
 import re, sys
 m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(?:compute\s*)?(?:units?\s*)?(?:/|per\s*)\s*h(?:ou)?r", sys.stdin.read(), re.I)
 print(m.group(1) if m else "")'; }
-RATE0=$("${COLAB[@]}" usage 2> /dev/null | rate || true)
+# The other sessions on the account, without this one: compared before and
+# after allocation to tell whether the rate difference is this session's alone.
+others() { timeout 60 "${COLAB[@]}" sessions < /dev/null 2> /dev/null | grep -v -F -- "$SESSION"; return "${PIPESTATUS[0]}"; }
 WAIT=${GPU_WAIT_MIN:-240}
 for try in $(seq $(( WAIT / 5 + 1 ))); do
-	"${COLAB[@]}" new --gpu "$GPU" -s "$SESSION" && break
+	# Sampled right before each try, so the window is seconds, not the wait.
+	RATE0=$(timeout 60 "${COLAB[@]}" usage < /dev/null 2> /dev/null | rate || true)
+	OTHERS0=$(others) && OK0=1 || OK0=0
+	"${COLAB[@]}" new "${NEW[@]}" -s "$SESSION" && break
 	[ "$try" -gt $(( WAIT / 5 )) ] && { say "no $GPU after $WAIT min: stop"; exit 1; }
 	say "no free $GPU yet (try $try), waiting 5 min"; sleep 300
 done
@@ -151,10 +161,24 @@ trap cleanup EXIT
 USAGE=$(timeout 60 "${COLAB[@]}" usage 2> /dev/null || true)
 echo "$USAGE" | head -5 >> "$RES/driver.log"
 RATE1=$(echo "$USAGE" | rate || true)
-# The ceilings use the account's whole rate after allocation: never less than this
-# session's own, so with other sessions running they are stricter, never looser.
-OWN=$RATE1
-say "rate: account ${RATE1:-unknown} units/hour with this session (before it: ${RATE0:-unknown}); ceilings use the account rate"
+# The ceilings use this session's own rate: the account's rate after allocation
+# minus the rate sampled just before it, but only when `colab sessions` shows
+# the same other sessions before and after (none started or stopped in
+# between). Otherwise a GPU job beside a cheap CPU one would make the CPU job
+# refuse its max_rate or stop after minutes. When the other sessions changed or
+# can't be listed, or the difference is not above zero, the account's whole
+# rate is used, which is never less than this session's own.
+OTHERS1=$(others) && OK1=1 || OK1=0
+SAME=0; [ "$OK0$OK1" = 11 ] && [ "$OTHERS0" = "$OTHERS1" ] && SAME=1
+OWN=$(python3 -c "
+import sys
+a, b, same = sys.argv[1], sys.argv[2], sys.argv[3] == '1'
+try:
+    d = float(a) - float(b)
+    print(f'{d:.3f}' if same and d > 0 else a)
+except ValueError:
+    print(a)" "${RATE1:-}" "${RATE0:-}" "$SAME")
+say "rate: account ${RATE1:-unknown} units/hour with this session (before it: ${RATE0:-unknown}; other sessions $([ "$SAME" = 1 ] && echo unchanged || echo 'changed or unknown')); ceilings use ${OWN:-unknown} units/hour"
 if [ -n "$MAXUNITS" ]; then
 	# A model run spends only with a known rate, under its ceiling, and no longer than its units allow.
 	[ -n "$OWN" ] || { say "hourly rate unknown: refusing to spend; stop"; exit 1; }

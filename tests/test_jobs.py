@@ -138,6 +138,18 @@ class JobTests(unittest.TestCase):
         text = (SCRIPTS / "colab_job.sh").read_text(encoding="utf-8")
         self.assertIn('SCREEN_ARG=--no-screen; [ "$TYPE" = godot-capture ] && SCREEN_ARG=""', text)
 
+    def test_cpu_runtime_options(self):
+        self.assertEqual(cloudrun.validate(job(type="shell", gpu="CPU", high_mem=True)), [])
+        steps = " ".join(cloudrun.plan(job(type="shell", gpu="CPU", high_mem=True))["steps"])
+        self.assertIn("colab new --high-mem", steps)
+        self.assertNotIn("--gpu", steps)
+        self.assertIn("lavapipe", " ".join(cloudrun.plan(job(gpu="CPU"))["steps"]))
+        self.assertIn("high_mem must be true or false", cloudrun.validate(job(high_mem="yes")))
+        plan = json.loads((cloudrun.RECIPES_DIR / "stable-audio-open-sfx" / "plan.example.json").read_text())
+        mj = {"schema": 1, "id": "audio-test", "type": "model-run", "recipe": "stable-audio-open-sfx",
+              "plan": plan, "max_minutes": 20, "max_units": 1, "gpu": "CPU"}
+        self.assertTrue(any("runs on" in e for e in cloudrun.validate(mj)))
+
     def test_plan_refuses_an_invalid_job(self):
         with self.assertRaises(ErrandError):
             cloudrun.plan(job(id="x"))
@@ -262,6 +274,53 @@ class CliAndScriptsTests(unittest.TestCase):
             self.assertNotIn("not confirmed", r.stdout)
             time.sleep(7)
             self.assertEqual((tmp / "stops").read_text().strip(), "1")
+
+    def test_cpu_runtime_asks_for_no_gpu_and_counts_only_its_own_rate(self):
+        # Stub Colab CLI: logs each `new`; `usage` reads 1.94 units/hour (a GPU
+        # session already on the account) before the runtime and 2.04 after,
+        # so this session's own rate is 0.1, over the job's max_rate of 0.05.
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            src = tmp / "src"
+            src.mkdir()
+            (src / "README").write_text("x")
+            git = lambda *a: subprocess.run(["git", "-C", str(src), *a], check=True, capture_output=True)
+            git("init", "-q", "-b", "main")
+            git("add", "-A")
+            git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x")
+            (tmp / "gh/owner").mkdir(parents=True)
+            subprocess.run(["git", "clone", "-q", "--bare", str(src), str(tmp / "gh/owner/game.git")], check=True)
+            stub = tmp / "colab"
+            stub.write_text(
+                "#!/bin/bash\n"
+                "for a in \"$@\"; do case \"$a\" in\n"
+                " usage) if [ -e \"$STUB/new.txt\" ]; then echo 'Current rate: 2.04 units/hour'; else echo 'Current rate: 1.94 units/hour'; fi; exit 0;;\n"
+                " new) echo \"$*\" >> \"$STUB/new.txt\"; exit 0;;\n"
+                " sessions) echo 'other-l4 L4 running'; [ -e \"$STUB/new.txt\" ] && [ -e \"$STUB/churn\" ] && echo 'other-a100 A100 running'; exit 0;;\n"
+                " stop) exit 0;;\n"
+                "esac; done\nexit 0\n")
+            stub.chmod(0o755)
+            jf = tmp / "cpu.json"
+            jf.write_text(json.dumps(job(repo="owner/game", ref="main", gpu="CPU", high_mem=True,
+                                         max_units=0.2, max_rate=0.05)))
+            env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp), "STUB": str(tmp), "ERRAND_HOME": str(tmp / "home"),
+                   "COLAB_BIN": str(stub), "ERRAND_STOP_PAUSE": "0", "GH": f"file://{tmp}/gh/"}
+            r = subprocess.run(["bash", str(SCRIPTS / "colab_job.sh"), str(jf)], env=env,
+                               capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            new = (tmp / "new.txt").read_text()
+            self.assertNotIn("--gpu", new)
+            self.assertIn("--high-mem", new)
+            self.assertIn("ceilings use 0.100 units/hour", r.stdout)
+            self.assertIn("over the job's max_rate 0.05", r.stdout)
+            # Another session started meanwhile: the difference is not this
+            # session's alone, so the ceiling falls back to the account rate.
+            (tmp / "new.txt").unlink()
+            (tmp / "churn").touch()
+            r = subprocess.run(["bash", str(SCRIPTS / "colab_job.sh"), str(jf)], env=env,
+                               capture_output=True, text=True, timeout=60)
+            self.assertIn("other sessions changed or unknown", r.stdout)
+            self.assertIn("ceilings use 2.04 units/hour", r.stdout)
 
     def test_service_host_never_runs_job_commands(self):
         # The host packs, copies and polls; setup and command run only on the runtime.

@@ -40,6 +40,8 @@ gpu-errand plan examples/jobs/hello-gpu.json     # every step, with the caps
 COLAB_SESSION=hello-1 gpu-errand run examples/jobs/hello-gpu.json
 ```
 
+Work that needs no GPU (tests, headless sims, benchmarks) can take a cheaper CPU-only runtime: set `"gpu": "CPU"` (see [examples/jobs/hello-cpu.json](examples/jobs/hello-cpu.json)).
+
 Results land in `~/.gpu-errand/results/<id>-<time>/out/`, with the runner's own logs beside them. Set `RESULTS_REPO=you/private-repo` and they are also pushed to branch `errand-results/<id>`, where a cloud agent can read them.
 
 To let your coding agent drive it, install the skill:

@@ -23,3 +23,11 @@ What we learned running real jobs: a large Godot 4.7 game (29 GB) and a small Go
 - The ssh link through `colab ssh --proxy-mode` can drop mid-start (an A100 start hung 2.5 min, then `Broken pipe`, Oct 2026). Every start-up step in the runner is safe to repeat and gets three tries; the job start checks runner.pid so a retry never starts it twice.
 - Python model stacks on Colab (audio tests, Oct 2026): the default kernel was Python 3.13 and `venv` bootstrap failed; `uv venv --python 3.12` worked. Set `MPLBACKEND=Agg` (Colab's inline backend is missing inside a uv env). Diffusers' Stable Audio scheduler needs `torchsde`. Check imports before downloading weights.
 - Connection drops happen (websocket, ssh, HTTP 429 right after start-up); retry the first ssh a few times, and rerun a job once when its log shows an infrastructure error.
+
+## Colab CPU runtime (`"gpu": "CPU"`)
+
+- `colab new` with no `--gpu`/`--tpu` gives a CPU-only runtime (CLI 0.7.4); `--high-mem` asks for High-RAM, which comes with more cores. Added Oct 2026 after headless Godot benches had been taking L4s (about 1.9 units an hour) for work that never touched the GPU.
+- No NVIDIA driver: a `shell` job records `gpu=none` in `env.txt`; a `godot-capture` job gets Xvfb and the software driver (lavapipe), which is slow.
+- Rate, cores and RAM depend on the plan and change: measure, then set `max_rate` just above the CPU rate so a job can never spend at a GPU's rate by mistake.
+- The unit ceiling uses this session's own rate (the account's rate just after allocation minus just before), so a CPU job running beside a GPU job is not capped at the GPU's price. That difference counts only when `colab sessions` lists the same other sessions before and after; if they changed or can't be listed, or the difference is not above zero, the account's whole rate is used. A runtime that `colab sessions` doesn't list (one opened in a browser) and stops in those few seconds can still make the difference read low.
+

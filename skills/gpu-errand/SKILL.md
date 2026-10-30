@@ -24,6 +24,7 @@ Start from [examples/jobs](../../examples/jobs) and the [job format](references/
 - Git decides what runs: the runner packs exactly the commit `ref` names, without `.git`. Push first.
 - Write results under `$OUT_DIR`. `$JOB_ID` and `$ERRAND_COMMIT` are set for you.
 - No credentials go to a runtime, and `env` refuses names that look like secrets.
+- Pick the cheapest runtime that fits. `"gpu": "CPU"` gives a runtime with no GPU (add `"high_mem": true` for more cores and RAM) for tests, headless sims and benches; it costs a small fraction of a GPU's units an hour. Use a GPU only when the job draws or needs CUDA.
 - `max_units` is the spending ceiling: `model-run` needs it, and the other types should carry the person's cap in it too. Add `max_rate` (units per hour) to refuse a pricier GPU than expected.
 
 ## 2. Check it and show the plan
