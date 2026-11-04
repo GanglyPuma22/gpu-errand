@@ -7,6 +7,7 @@
     gpu-errand run JOB.json               run one job on a Colab GPU now (spends units)
     gpu-errand here JOB.json CHECKOUT OUT run a job on this machine (free)
     gpu-errand service go|stop|status|run the standing queue
+    gpu-errand status [ID ...]            live status of runs on this host (stage, step, ETA, GPU, units)
     gpu-errand where                      where the scripts and recipes are installed
 """
 
@@ -33,6 +34,26 @@ def _shell(script, args):
     os.execvpe("bash", ["bash", str(SCRIPTS / script), *args], env)
 
 
+def _live_status():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gpu_errand_live_status", SCRIPTS / "live_status.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _status(ids, as_json):
+    ls = _live_status()
+    work = os.environ.get("ERRAND_HOME") or str(Path.home() / ".gpu-errand")
+    if not as_json:
+        return ls.show(work, ids)
+    folder = Path(work) / "status"
+    files = [folder / f"{i}.json" for i in ids] if ids else sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    _print([{k: v for k, v in ls.load(f).items() if not k.startswith("_")} for f in files])
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gpu-errand", description="Run agent jobs on a Google Colab GPU with a spending cap.")
     p.add_argument("--version", action="version", version=f"gpu-errand {__version__}")
@@ -56,6 +77,9 @@ def main(argv=None):
     c.add_argument("out")
     c = sub.add_parser("service", help="the standing queue")
     c.add_argument("action", choices=["go", "stop", "status", "run"])
+    c = sub.add_parser("status", help="live status of runs on this host")
+    c.add_argument("ids", nargs="*", help="job ids (default: all, newest first)")
+    c.add_argument("--json", action="store_true", help="the status files themselves")
     sub.add_parser("where", help="where the scripts and recipes are")
     a = p.parse_args(argv)
 
@@ -79,6 +103,8 @@ def main(argv=None):
             _shell("run_here.sh", [a.job, a.checkout, a.out])
         elif a.command == "service":
             _shell("service.sh", [a.action])
+        elif a.command == "status":
+            return _status(a.ids, a.json)
         elif a.command == "where":
             _print({"package": str(PKG), "scripts": str(SCRIPTS), "recipes": str(jobs.RECIPES_DIR)})
     except jobs.ErrandError as e:

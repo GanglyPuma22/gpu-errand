@@ -62,8 +62,17 @@ Exit codes:
 | 2 | The job was refused. |
 | 3 | Results not delivered. |
 | 4 | Results did not match the runtime's list. |
+| 5 | The runtime was lost: it had no job on it, its session was gone, or it stopped answering for 5 minutes. It is stopped at once. |
+| 6 | Stopped early: the GPU read 0 % for `gpu_idle_minutes` (default 5) while the job ran. The job was paying GPU rates for CPU work. |
+| 7 | Refused: the same job id or session name is already running on this host, or Colab already lists that session name. |
 
 On any failure, read `driver.log`, `setup.log` and `run.log`, then report. Never rerun, switch GPU or raise a cap by yourself.
+
+### Watch it while it runs
+
+Every minute the host updates `~/.gpu-errand/status/<id>.json`: stage, the job's own step and ETA, GPU use, and units spent so far against the ceiling. Read it with `gpu-errand status` (one line per job; a running job not updated for 3 minutes is flagged STALE). With `RESULTS_REPO` set it is also pushed every 5 minutes to branch `errand-status/<id>`, where a cloud agent can read `STATUS.txt`.
+
+For a step and an ETA, have the job append lines like `render 140/3000` to `$ERRAND_PROGRESS`. Without them the status shows the last line of the job's log. A job that legitimately spends more than 5 minutes on the CPU before using the GPU sets `gpu_idle_minutes` higher, or `0` to turn the check off.
 
 `gpu-errand here job.json <checkout> <out>` runs `shell` and `godot-capture` jobs on this machine instead. It's free, and slow without a GPU.
 

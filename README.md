@@ -17,6 +17,7 @@ So the runner refuses to spend without a ceiling. It never sends a credential to
 ## What you get
 
 - **A spending cap that holds.** Each job can set `max_units` (model runs must) and optionally `max_rate`. The runner reads Colab's hourly rate once the GPU is granted. It refuses an unknown or too-high rate, and it stops the runtime at the time or unit ceiling, whichever comes first. It also stops the runtime on any error, and keeps retrying if a stop fails.
+- **No black box while it runs.** `gpu-errand status` shows each run's stage, the job's own step and ETA, GPU use and units spent so far, updated every minute. A runtime that loses its job is stopped at once, a GPU job that sits at 0 % GPU for 5 minutes is stopped early, and a second copy of a running job is refused before it can touch the first one's runtime.
 - **Results you can trust.** The runtime makes a SHA-256 list of its outputs, and the host checks each file after copying it back. Model runs also write `receipt.json` with each output's hash, length, peak and loudness. A run with missing, silent or broken outputs fails.
 - **No secrets on the runtime.** Only the job's commit (from `git archive`, no `.git`) and the scripts go there. For gated Hugging Face models, the host turns its own login into short-lived download links, and the token stays home.
 - **A queue, or run now.** Agents can push jobs to a queue branch in a private repo, and a small service on your always-on machine works through them after you type `go`. Or run one job right away, beside the queue.
