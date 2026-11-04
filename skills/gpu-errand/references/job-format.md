@@ -10,16 +10,17 @@ One JSON object per job. `gpu-errand validate <file>` checks every rule below; `
 | `repo` | yes | `owner/name`. The service also checks it against its `ALLOW_REPOS`. |
 | `ref` | yes | Branch or commit. The runner packs exactly this commit. The service checks branches against `ALLOW_REFS`. |
 | `setup` | no | One line of shell run from the repository root before `command` (fetch the engine, import). |
-| `command` | yes | One line of shell run from the repository root. Write results under `$OUT_DIR`. `$ERRAND_COMMIT` holds the full commit id (the copy has no `.git`). |
+| `command` | yes | One line of shell run from the repository root. Write results under `$OUT_DIR`. `$ERRAND_COMMIT` holds the full commit id (the copy has no `.git`). For live progress, append lines to `$ERRAND_PROGRESS`, such as `render 140/3000`: an `N/M` or `N of M` gives the status an ETA. |
 | `where` | no | `colab` (default) or `here`. |
 | `gpu` | no | `L4` (default), `T4`, `A100`, or `CPU` for a runtime with no accelerator (`colab new` with no `--gpu`). Use `CPU` for work that never touches a GPU: tests, headless sims, benches. It costs a small fraction of a GPU's units an hour, with fewer cores. A `godot-capture` job on `CPU` draws with the software Vulkan driver; a headless job should be `shell`. What the account can hold decides how many run at once. |
 | `high_mem` | no | `true` asks for Colab's High-RAM runtime (`--high-mem`), which also has more CPU cores; needs a plan that offers it. |
+| `gpu_idle_minutes` | no | 0-240 (default 5; a recipe may set its own, `ace-step-music` uses 10). On a GPU, the run stops early (exit 6) when the GPU reads 0 % for this long while `command` runs. `0` turns the check off. Never applies to `CPU`. |
 | `max_minutes` | yes | 1-240. Setup and command together; the runner adds 20 minutes for the runtime to start and copy in. |
 | `max_units` | no | 0.01-20 compute units, as for `model-run` below. On Colab the runtime is stopped at this ceiling or the time cap, whichever comes first. Set it whenever the person gave a unit cap. |
 | `max_rate` | no | Units per hour, with `max_units`: the run stops at once if the session's rate is higher. On `CPU`, set it just above the CPU rate so the job can never spend at a GPU's rate. |
 | `results_max_mb` | no | 1-500 (default 200). Past it, only files under 10 MB come back. Files over 10 MB never go to a results branch. |
 | `godot` | no | `{"url": "https://...zip", "sha256": "<64 hex>"}`: the runner downloads the engine, checks it and sets `GODOT`. A game that fetches its own engine in `setup` leaves this out. |
-| `env` | no | `{"NAME": "value"}`, upper-case names, one-line values. Not `OUT_DIR`, `GODOT`, `JOB_ID`, `ERRAND_COMMIT`, `DISPLAY`, and nothing that looks like a token, secret, password or key. |
+| `env` | no | `{"NAME": "value"}`, upper-case names, one-line values. Not `OUT_DIR`, `GODOT`, `JOB_ID`, `ERRAND_COMMIT`, `ERRAND_PROGRESS`, `DISPLAY`, and nothing that looks like a token, secret, password or key. |
 
 ## model-run jobs
 
@@ -40,4 +41,8 @@ One JSON object per job. `gpu-errand validate <file>` checks every rule below; `
 
 ## Results
 
-From a Colab run, the results folder holds the host's files: `driver.log`, `BUILD.txt` (repository, ref, commit, GPU and the `gpu=` line) and `removed-not-regular.txt`. Its `out/` folder holds the job's own `OUT_DIR`, with only regular files kept. In `out/` the runner adds `runner.json` (`{"id", "setup_exit", "run_exit", "minutes", "gpu"}`), `env.txt` (what the runtime had), `setup.log`, `run.log`, `progress.txt` and `MANIFEST.sha256`. `setup` and `command` share `max_minutes`: the command gets only the time setup left.
+From a Colab run, the results folder holds the host's files: `driver.log`, `BUILD.txt` (repository, ref, commit, GPU and the `gpu=` line) and `removed-not-regular.txt`. Its `out/` folder holds the job's own `OUT_DIR`, with only regular files kept. In `out/` the runner adds `runner.json` (`{"id", "setup_exit", "run_exit", "minutes", "gpu"}`), `env.txt` (what the runtime had), `setup.log`, `run.log`, `progress.txt`, `job-progress.txt` (the job's own progress lines), `gpu.csv` (GPU %, MiB every 10 s, on a GPU) and `MANIFEST.sha256`; the results folder also keeps `status.json`, the last live status. `setup` and `command` share `max_minutes`: the command gets only the time setup left.
+
+## Live status
+
+While a job runs, the host keeps `~/.gpu-errand/status/<id>.json`, updated every minute: `state` (running, done, failed), `stage` (packing, waiting-gpu, starting, copying, preparing, setup, run, results, done, or lost), `step` and `eta_min` from `$ERRAND_PROGRESS`, `last_line` of the log, `gpu_util` (highest % over the last minute) and `gpu_mem_mb`, `rate`, `units_spent` (own rate times runtime time) against `max_units`, `elapsed_min` and `note`. `gpu-errand status` prints one line per job, `--json` the files. With `RESULTS_REPO` set it is also pushed every `STATUS_PUSH_MIN` minutes (default 5, `0` off) to branch `errand-status/<id>`.
